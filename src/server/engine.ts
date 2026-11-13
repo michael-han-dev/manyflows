@@ -43,8 +43,9 @@ async function processComment(env: Env, event: Extract<Event, { kind: 'comment' 
 }
 async function processResponse(env: Env, event: Extract<Event, { kind: 'response' }>) {
   const time = await now(env);
+  await run(env, 'INSERT OR IGNORE INTO contacts(id,account_id,instagram_id,username,created_at) VALUES(?,?,?,?,?)', await digest(`${event.accountId}:${event.senderId}`), event.accountId, event.senderId, event.username, time);
   const person = await one<ContactRow>(env, 'SELECT * FROM contacts WHERE account_id=? AND instagram_id=?', event.accountId, event.senderId);
-  if (!person) { await run(env, 'UPDATE events SET applied_at=? WHERE id=?', time, event.id); return; }
+  if (!person) throw new Error('Missing response contact');
   let active: RunRow | null = null;
   let target: string | null = null;
   let emailCaptured = false;
