@@ -12,9 +12,9 @@ const webhookSchema = z.object({ object: z.literal('instagram'), entry: z.array(
 const commentSchema = z.object({ id: z.string(), from: z.object({ id: z.string(), username: z.string().optional() }), media: z.object({ id: z.string() }), text: z.string(), timestamp: z.union([z.number(), z.string()]).optional() });
 const responseSchema = z.object({ sender: z.object({ id: z.string() }), recipient: z.object({ id: z.string() }), timestamp: z.number().optional(), message: z.object({ mid: z.string(), text: z.string().optional(), is_echo: z.boolean().optional(), quick_reply: z.object({ payload: z.string() }).optional() }).optional(), postback: z.object({ mid: z.string().optional(), title: z.string().optional(), payload: z.string() }).optional() });
 const eventTime = (value: string | number | undefined, fallback: number) => { const number = typeof value === 'string' ? Date.parse(value) : value ?? fallback; return Number.isFinite(number) ? (number < 1e12 ? number * 1000 : number) : fallback; };
-export async function ingestSigned(env: Env, body: string, signature: string, secret = env.META_APP_SECRET) {
+export async function ingestSigned(env: Env, body: string | ArrayBuffer, signature: string, secret = env.META_APP_SECRET) {
   if (!secret || !await validSignature(secret, body, signature)) throw new ApiError(401, 'Invalid webhook signature.');
-  const payload = webhookSchema.parse(JSON.parse(body));
+  const payload = webhookSchema.parse(JSON.parse(typeof body === 'string' ? body : new TextDecoder().decode(body)));
   const time = await now(env);
   const events: Event[] = [];
   for (const entry of payload.entry) {

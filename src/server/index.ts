@@ -21,8 +21,8 @@ app.get('/webhooks/instagram', c => {
   return c.text(c.req.query('hub.challenge') ?? '');
 });
 app.post('/webhooks/instagram', async c => {
-  const body = await c.req.text();
-  if (body.length > 1000000) throw new ApiError(400, 'Webhook body is too large.');
+  const body = await c.req.arrayBuffer();
+  if (body.byteLength > 1000000) throw new ApiError(400, 'Webhook body is too large.');
   await ingestSigned(c.env, body, c.req.header('x-hub-signature-256') ?? '');
   c.executionCtx.waitUntil(dispatch(c.env));
   return c.json({ ok: true });
