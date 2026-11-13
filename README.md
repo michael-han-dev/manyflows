@@ -2,7 +2,7 @@
 
 A private Instagram automation workspace for accounts you own and manage. Build comment-to-DM campaigns, edit branching flows, store conversations and leads, and attribute resource-link clicks to campaigns.
 
-The application uses TypeScript, React, Cloudflare Workers, D1, and Queues. [the_plan.md](the_plan.md) records the product plan. [implement.md](implement.md) records execution progress and verification limits.
+The application uses TypeScript, React, Cloudflare Workers, D1, and Queues.
 
 ## Run locally
 
@@ -61,13 +61,15 @@ Keep ManyChat connected during investigation. Before enabling overlapping produc
 Local development and the end-to-end suite do not create hosted resources. Deployment requires separate owner setup.
 
 1. Authenticate Wrangler to the intended Cloudflare account. Confirm the account before creating resources.
-2. Create D1 and replace the placeholder database ID in `wrangler.jsonc`. Set an explicit account ID when you have access to more than one account.
-3. Create the queue and dead-letter queue named in `wrangler.jsonc`.
+2. Confirm the account and database IDs in `wrangler.jsonc`. When deploying to another account, create D1 and replace those IDs.
+3. Create the queue and dead-letter queue named in `wrangler.jsonc` only if they do not already exist.
 4. Set `PUBLIC_BASE_URL` to the deployment's HTTPS origin and disable `DEMO_MODE`.
 5. Set new production values for `ADMIN_PASSWORD`, `SESSION_SECRET`, and `TOKEN_ENCRYPTION_KEY`, plus Meta app credentials and the verification token. Preserve the encryption key during redeployments.
-6. Apply remote migrations, build, and deploy.
-7. Configure Meta's callback and webhook subscription, then authorize the pilot account.
-8. Verify the live pilot before migrating other accounts.
+6. For the first deployment, set `workers_dev` and `preview_urls` to `false`. Apply remote migrations, build, and deploy.
+7. Configure Cloudflare Access before enabling the public hostname, as described below.
+8. Set `workers_dev` to `true`, keep `preview_urls` disabled, and deploy again. Verify anonymous requests are redirected to Access and the owner can sign in.
+9. Configure Meta's callback and webhook subscription, then authorize the pilot account.
+10. Verify the live pilot before migrating other accounts.
 
 Example commands, to run only after selecting your account and matching the resource names to the checked-in configuration:
 
@@ -87,6 +89,23 @@ npm run deploy
 ```
 
 Authentication, remote resource creation, secrets, migration, and deployment are not performed automatically.
+
+### Restrict dashboard access
+
+In Cloudflare Zero Trust, create a self-hosted Access application covering the entire deployment hostname. Use an Allow policy with the owner's exact email. Do not use an email-domain rule for a personal Gmail address.
+
+Create a second Access application with only these two destinations on the same hostname:
+
+- `/webhooks/instagram`
+- `/r/*`
+
+Give that application a Bypass policy including Everyone. These paths serve Meta's webhook and resource recipients. The webhook still checks the configured verification token and request signatures. The dashboard, assets, `/api/*`, and `/auth/*` remain protected by the broader application. The Instagram OAuth callback stays behind Access because it is an owner browser redirect.
+
+[Cloudflare applies the most specific path policy](https://developers.cloudflare.com/cloudflare-one/access-controls/policies/app-paths/). Protect every hostname that serves the dashboard. Keep preview URLs disabled. If adding a custom domain, configure Access for it before routing traffic there.
+
+Cloudflare Access checks identity first. The application then requires its separate `ADMIN_PASSWORD`. Production credentials are saved locally in the ignored `.dev.vars.production.json` with owner-only file permissions and stored remotely as Worker secrets. Preserve the token encryption key when redeploying.
+
+After deployment, run `npm run test:hosted` to check anonymous dashboard and API protection, public recipient-link routing, and webhook rejection. If the local production secret file or `META_WEBHOOK_VERIFY_TOKEN` is available, it also verifies Meta's subscription challenge. The checks do not send Instagram messages or change campaigns. Owner sign-in and real Instagram delivery need separate verification.
 
 ## Operational behavior
 

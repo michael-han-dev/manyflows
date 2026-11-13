@@ -11,6 +11,7 @@
     "check": "tsc --noEmit",
     "db:migrate": "wrangler d1 migrations apply DB --local",
     "test:e2e": "npm run build && playwright test",
+    "test:hosted": "npm run build && node scripts/verify-hosted.mjs",
     "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
