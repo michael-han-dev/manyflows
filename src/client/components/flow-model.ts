@@ -11,9 +11,10 @@ export function readTemplate(flow: Flow): TemplateModel | null {
   const resource = flow.nodes.find(node => node.id === 'resource');
   const email = flow.nodes.find(node => node.id === 'email');
   const delay = flow.nodes.find(node => node.id === 'reminder_delay');
+  const reminderCheck = flow.nodes.find(node => node.id === 'reminder_check');
   const reminder = flow.nodes.find(node => node.id === 'reminder');
   const done = flow.nodes.find(node => node.id === 'done');
-  const allowed = new Set(['opening', 'resource', 'email', 'reminder_delay', 'reminder', 'done']);
+  const allowed = new Set(['opening', 'resource', 'email', 'reminder_delay', 'reminder_check', 'reminder', 'done']);
   if (flow.nodes.some(node => !allowed.has(node.id)) || resource?.kind !== 'message' || done?.kind !== 'end' || done.outcome !== 'complete') return null;
   const link = resource.buttons[0];
   if (resource.buttons.length !== 1 || link?.kind !== 'url') return null;
@@ -21,7 +22,7 @@ export function readTemplate(flow: Flow): TemplateModel | null {
   if (email && (email.kind !== 'collect' || email.field !== 'email' || email.next !== 'resource' || !opening)) return null;
   if (opening?.kind === 'message' && opening.buttons[0]?.kind === 'reply' && opening.buttons[0].next !== (email ? 'email' : 'resource')) return null;
   if (flow.entry !== (opening ? 'opening' : 'resource')) return null;
-  if ((delay || reminder) && (!opening || delay?.kind !== 'delay' || reminder?.kind !== 'message' || delay.next !== 'reminder' || reminder.next !== 'done' || reminder.buttons.length !== 0)) return null;
+  if ((delay || reminder || reminderCheck) && (!opening || delay?.kind !== 'delay' || reminder?.kind !== 'message' || delay.next !== 'reminder_check' || reminder.next !== 'done' || reminder.buttons.length !== 0 || reminderCheck?.kind !== 'condition' || reminderCheck.field !== '$link_clicked' || reminderCheck.operator !== 'is_set' || reminderCheck.yes !== 'done' || reminderCheck.no !== 'reminder')) return null;
   if (resource.next !== (delay ? 'reminder_delay' : 'done')) return null;
   return {
     opening: Boolean(opening), openingText: opening?.kind === 'message' ? opening.text : 'Hey! Want the free guide?', openingButton: opening?.kind === 'message' ? opening.buttons[0]?.label ?? 'Send me the guide' : 'Send me the guide',
@@ -37,7 +38,8 @@ export function writeTemplate(model: TemplateModel): Flow {
   if (model.opening && model.email) nodes.push({ id: 'email', kind: 'collect', field: 'email', prompt: model.emailPrompt, next: 'resource' });
   nodes.push({ id: 'resource', kind: 'message', text: model.resourceText, buttons: [{ kind: 'url', label: model.resourceLabel, url: model.resourceUrl }], next: model.opening && model.reminder ? 'reminder_delay' : 'done' });
   if (model.opening && model.reminder) {
-    nodes.push({ id: 'reminder_delay', kind: 'delay', seconds: model.reminderSeconds, next: 'reminder' });
+    nodes.push({ id: 'reminder_delay', kind: 'delay', seconds: model.reminderSeconds, next: 'reminder_check' });
+    nodes.push({ id: 'reminder_check', kind: 'condition', field: '$link_clicked', operator: 'is_set', value: '', yes: 'done', no: 'reminder' });
     nodes.push({ id: 'reminder', kind: 'message', text: model.reminderText, buttons: [], next: 'done' });
   }
   nodes.push({ id: 'done', kind: 'end', outcome: 'complete' });
