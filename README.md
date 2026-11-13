@@ -33,7 +33,7 @@ npm run test:e2e
 
 The suite starts a separate local Worker on port 8788 and applies real SQL migrations to isolated D1 storage under `.wrangler/e2e-state`. Test credentials live in a generated ignored configuration. The suite does not change `.dev.vars`.
 
-The application, database, webhook verification, flow engine, and redirect routes run normally. Only the external Meta service is simulated for demo accounts. Browser tests drive the rendered dashboard. No unit tests are included.
+The application, database, webhook verification, flow engine, and redirect routes run normally. Only the external Meta service is simulated for demo accounts. Browser tests drive the rendered dashboard. The restart check stops and restarts a separate local Worker on port 8789 with its own D1 state, then resumes a waiting conversation. No unit tests are included.
 
 Failure reports and traces are written to `playwright-report` and `test-results`. Run `npx playwright show-report` to inspect the report.
 
@@ -97,5 +97,9 @@ The webhook receiver checks signatures over the original request body and stores
 Message eligibility is checked when sending. Initial private replies and continuing DMs have different rules. An external website visit does not open the Instagram messaging window.
 
 Resource buttons use saved, opaque tracking URLs. The redirect records a visit and forwards the recipient to the destination, such as Notion. Link previews can create automated visits. Forwarded links remain attributed to the original message rather than a verified visitor identity.
+
+Confirmed deletion removes the selected stored data and dependent records. Minimal hashes of processed event identifiers remain to prevent old webhook retries from recreating deleted conversations or sending the same replies again. These receipts contain no message payloads, usernames, account credentials, or original event identifiers.
+
+Records are retained until the owner deletes them. Dashboard record lists have bounds and show a configuration warning when those limits are reached. The JSON export includes all matching records, published versions, and attribution history without dashboard row caps, while excluding credentials and internal authentication state.
 
 Dashboard sends mean API-accepted messages unless another delivery status is available. Content engagement and automation response rates have separate denominators. Missing insights remain unavailable.
