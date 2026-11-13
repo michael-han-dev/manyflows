@@ -1,9 +1,11 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { campaignInputSchema, validateFlow, type Bootstrap, type Click, type Message } from '../shared/domain';
+import { campaignInputSchema, validateFlow, type Bootstrap, type Click, type Message, type ProcessingJob } from '../shared/domain';
 import { ApiError, account, action, baseUrl, buttons, campaign, campaignSelect, contact, demoAllowed, flowRun, graphVersion, media, now, one, requireValue, rows, run, statement, uid, type AccountRow, type ActionRow, type AppEnv, type CampaignRow, type PublishedCampaignRow, type ContactRow, type Env, type MediaRow, type RunRow } from './core';
 import { syncAccount } from './meta';
+import { dispatch, eventSchema } from './events';
 
+interface JobRow { id: string; account_id: string; kind: ProcessingJob['kind']; state: ProcessingJob['state']; attempts: number; error: string | null; available_at: number; received_at: number; }
 interface MessageRow { id: string; account_id: string; contact_id: string; run_id: string | null; direction: Message['direction']; channel: Message['channel']; text: string; buttons: string; status: Message['status']; created_at: number; }
 interface ClickRow { id: string; account_id: string; campaign_id: string; run_id: string; contact_id: string; link_id: string; automated: number; created_at: number; }
 const date = (value: string | undefined, fallback: number) => { if (!value) return fallback; const parsed = /^\d+$/.test(value) ? Number(value) : Date.parse(value); if (!Number.isFinite(parsed)) throw new ApiError(400, 'Invalid date range.'); return parsed; };
@@ -14,7 +16,7 @@ export async function bootstrap(env: Env, query: { accountId?: string; from?: st
   const accountWhere = '(? IS NULL OR account_id=?)';
   const rangeWhere = `${accountWhere} AND created_at>=? AND created_at<=?`;
   const limit = (size: number) => mode === 'dashboard' ? `LIMIT ${size}` : '';
-  const [accounts, medias, campaigns, contacts, runs, actions, messages, clicks, responses, emails] = await Promise.all([
+  const [accounts, medias, campaigns, contacts, runs, actions, messages, clicks, responses, emails, jobs] = await Promise.all([
     rows<AccountRow>(env, 'SELECT * FROM accounts ORDER BY mode,username'),
     rows<MediaRow>(env, `SELECT * FROM media WHERE ${accountWhere} ORDER BY published_at DESC ${limit(1000)}`, accountId, accountId),
     rows<PublishedCampaignRow>(env, `${campaignSelect} WHERE (? IS NULL OR campaigns.account_id=?) ORDER BY campaigns.created_at DESC`, accountId, accountId),
@@ -25,16 +27,18 @@ export async function bootstrap(env: Env, query: { accountId?: string; from?: st
     rows<ClickRow>(env, `SELECT * FROM clicks WHERE ${rangeWhere} ORDER BY created_at DESC ${limit(10000)}`, accountId, accountId, from, to),
     rows<{ contact_id: string }>(env, `SELECT DISTINCT contact_id FROM responses WHERE ${rangeWhere}`, accountId, accountId, from, to),
     rows<{ contact_id: string }>(env, `SELECT DISTINCT contact_id FROM email_captures WHERE ${rangeWhere}`, accountId, accountId, from, to),
+    rows<JobRow>(env, `SELECT outbox.id,events.account_id,json_extract(events.payload,'$.kind') AS kind,outbox.state,outbox.attempts,outbox.error,outbox.available_at,events.received_at FROM outbox JOIN events ON events.id=outbox.event_id WHERE outbox.state!='done' AND (? IS NULL OR events.account_id=?) ORDER BY events.received_at DESC ${limit(1000)}`, accountId, accountId),
   ]);
   const accepted = actions.filter(item => item.status === 'succeeded');
   const warnings = accounts.flatMap(account => account.sync_error ? [`@${account.username}: ${account.sync_error}`] : []);
   if (!env.META_APP_ID || !env.META_APP_SECRET) warnings.push('Meta is not configured. Local simulations do not prove live Instagram access.');
   if (env.META_INSIGHTS_ENABLED !== 'true') warnings.push('Instagram insights are disabled. Unavailable content metrics are shown as unknown.');
-  if (mode === 'dashboard' && (medias.length === 1000 || contacts.length === 5000 || runs.length === 5000 || messages.length === 10000 || actions.length === 10000 || clicks.length === 10000)) warnings.push('This view reached its record limit. Select a narrower date range or export all records.');
+  if (mode === 'dashboard' && (medias.length === 1000 || contacts.length === 5000 || runs.length === 5000 || messages.length === 10000 || actions.length === 10000 || clicks.length === 10000 || jobs.length === 1000)) warnings.push('This view reached its record limit. Select a narrower date range or export all records.');
   return {
     accounts: accounts.map(account), media: medias.map(media), campaigns: campaigns.map(campaign), contacts: contacts.map(contact), runs: runs.map(flowRun), actions: actions.map(action),
     messages: messages.map(item => ({ id: item.id, accountId: item.account_id, contactId: item.contact_id, runId: item.run_id, direction: item.direction, channel: item.channel, text: item.text, buttons: buttons.parse(JSON.parse(item.buttons)), status: item.status, createdAt: item.created_at })),
     clicks: clicks.map((item): Click => ({ id: item.id, accountId: item.account_id, campaignId: item.campaign_id, runId: item.run_id, contactId: item.contact_id, linkId: item.link_id, automated: !!item.automated, createdAt: item.created_at })),
+    jobs: jobs.map(item => ({ id: item.id, accountId: item.account_id, kind: item.kind, state: item.state, attempts: item.attempts, error: item.error, availableAt: item.available_at, receivedAt: item.received_at })),
     metrics: { matchedComments: runs.length, openingAccepted: accepted.filter(item => item.kind === 'private').length, linkMessagesAccepted: accepted.filter(item => buttons.parse(JSON.parse(item.buttons)).some(button => button.kind === 'url')).length, buttonResponders: responses.length, uniqueClickers: new Set(clicks.filter(click => !click.automated).map(click => click.contact_id)).size, emailsCollected: emails.length, completedRuns: runs.filter(item => item.state === 'complete').length, failedActions: actions.filter(item => item.status === 'failed' || item.status === 'uncertain').length },
     configuration: { demoEnabled: demoAllowed(env), metaConfigured: !!(env.META_APP_ID && env.META_APP_SECRET && env.TOKEN_ENCRYPTION_KEY), publicBaseUrl: baseUrl(env), webhookUrl: `${baseUrl(env)}/webhooks/instagram`, callbackUrl: `${baseUrl(env)}/auth/instagram/callback`, graphVersion: graphVersion(env), warnings },
   };
@@ -104,3 +108,19 @@ api.post('/api/campaigns/:id/duplicate', async c => {
   return c.json(campaign(requireValue(await one<PublishedCampaignRow>(c.env, `${campaignSelect} WHERE campaigns.id=?`, id))), 201);
 });
 api.post('/api/accounts/:id/sync', async c => { const account = requireValue(await one<AccountRow>(c.env, 'SELECT * FROM accounts WHERE id=?', c.req.param('id'))); await syncAccount(c.env, account); return c.json({ ok: true }); });
+
+api.post('/api/jobs/:id/retry', async c => {
+  const id = c.req.param('id');
+  const record = requireValue(await one<{ payload: string; applied_at: number | null }>(c.env, 'SELECT events.payload,events.applied_at FROM outbox JOIN events ON events.id=outbox.event_id WHERE outbox.id=?', id), 'Processing job not found.');
+  if (record.applied_at !== null) throw new ApiError(409, 'This event was already applied. Review its conversation and send outcomes.');
+  const event = eventSchema.parse(JSON.parse(record.payload));
+  const time = await now(c.env);
+  const reset = await statement(c.env, `UPDATE outbox SET state='pending',attempts=0,error=NULL,available_at=?,lease_until=NULL
+    WHERE id=? AND state IN ('pending','queued','processing','failed') AND COALESCE(lease_until,0)<=?
+    AND EXISTS(SELECT 1 FROM events WHERE events.id=outbox.event_id AND applied_at IS NULL)
+    AND NOT EXISTS(SELECT 1 FROM runs JOIN contacts ON contacts.id=runs.contact_id WHERE contacts.account_id=? AND contacts.instagram_id=? AND (runs.lock_until>? OR EXISTS(SELECT 1 FROM actions WHERE actions.run_id=runs.id AND actions.status IN ('executing','uncertain'))))
+    RETURNING id`, time, id, time, event.accountId, event.senderId, Date.now()).first();
+  if (!reset) throw new ApiError(409, 'This job has an active lease or an uncertain send, or was already applied. Wait for active work to finish and review send outcomes before retrying.');
+  c.executionCtx.waitUntil(dispatch(c.env));
+  return c.json({ ok: true });
+});

@@ -77,3 +77,11 @@ demo.post('/api/demo/pacing', async c => {
   if (input.milliseconds === 0) await run(c.env, 'UPDATE accounts SET next_send_at=0 WHERE id=?', input.accountId);
   return c.json({ ok: true });
 });
+
+demo.post('/api/demo/job-failure', async c => {
+  const input = z.object({ accountId: z.string(), enabled: z.boolean() }).parse(await c.req.json());
+  await demoAccount(c.env, input.accountId);
+  if (input.enabled) await run(c.env, "INSERT INTO settings(key,value) VALUES(?,'true') ON CONFLICT(key) DO UPDATE SET value=excluded.value", `job-failure:${input.accountId}`);
+  else await run(c.env, 'DELETE FROM settings WHERE key=?', `job-failure:${input.accountId}`);
+  return c.json({ ok: true });
+});

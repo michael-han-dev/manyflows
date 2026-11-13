@@ -108,6 +108,7 @@ export async function processJob(env: Env, id: string) {
     const record = await one<{ payload: string; applied_at: number | null }>(env, 'SELECT payload,applied_at FROM events WHERE id=?', claimed.event_id);
     if (record && !record.applied_at) {
       const event = eventSchema.parse(JSON.parse(record.payload));
+      if (demoAllowed(env) && await one(env, "SELECT 1 FROM settings JOIN accounts ON accounts.id=? AND accounts.mode='demo' WHERE settings.key=? AND settings.value='true'", event.accountId, `job-failure:${event.accountId}`)) throw new Error('Simulated processing failure');
       if (event.kind === 'comment') await processComment(env, event);
       else if (await processResponse(env, event) === 'deferred') {
         const exhausted = claimed.attempts >= 20;
@@ -119,7 +120,9 @@ export async function processJob(env: Env, id: string) {
     }
     await run(env, "UPDATE outbox SET state='done',lease_until=NULL,error=NULL WHERE id=?", id);
   } catch {
-    await run(env, "UPDATE outbox SET state=?,available_at=?,lease_until=NULL,error='Processing failed; scheduled for recovery.' WHERE id=?", claimed.attempts >= 20 ? 'failed' : 'pending', time + 60000, id);
+    const exhausted = claimed.attempts >= 20;
+    const delaySeconds = Math.min(3600, 2 ** Math.min(claimed.attempts - 1, 12));
+    await run(env, "UPDATE outbox SET state=?,available_at=?,lease_until=NULL,error=? WHERE id=?", exhausted ? 'failed' : 'pending', time + delaySeconds * 1000, exhausted ? 'Processing failed after 20 attempts. Resolve the service problem and retry this retained event.' : 'Processing failed; scheduled for recovery.', id);
   }
 }
 async function preparePayload(env: Env, item: ActionRow, journey: RunRow, person: ContactRow) {
