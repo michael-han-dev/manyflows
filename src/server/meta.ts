@@ -47,7 +47,7 @@ export async function bindNext(env: Env, accountId: string) {
   const pending = await rows<CampaignRow>(env, "SELECT * FROM campaigns WHERE account_id=? AND status='live' AND live_target_kind='next' AND armed_at IS NOT NULL AND bound_media_id IS NULL", accountId);
   for (const campaign of pending) {
     const baseline = new Set(strings.parse(JSON.parse(campaign.baseline)));
-    const publications = await rows<{ id: string }>(env, 'SELECT id FROM media WHERE account_id=? AND published_at>? ORDER BY published_at,id', accountId, campaign.armed_at);
+    const publications = await rows<{ id: string }>(env, 'SELECT id FROM media WHERE account_id=? AND published_at>=? ORDER BY published_at,id', accountId, Math.floor((campaign.armed_at ?? 0) / 1000) * 1000);
     const first = publications.find(item => !baseline.has(item.id));
     if (first) await run(env, 'UPDATE campaigns SET bound_media_id=? WHERE id=? AND bound_media_id IS NULL', first.id, campaign.id);
   }

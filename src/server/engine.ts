@@ -17,7 +17,7 @@ async function processComment(env: Env, event: Extract<Event, { kind: 'comment' 
   const pending = await one(env, "SELECT id FROM campaigns WHERE account_id=? AND status='live' AND live_target_kind='next' AND bound_media_id IS NULL", event.accountId);
   if (pending) { if (account.mode === 'live') await syncAccount(env, account); else await bindNext(env, account.id); }
   if (pending && !await one(env, 'SELECT id FROM media WHERE account_id=? AND id=?', event.accountId, event.mediaId)) throw new Error('Waiting for media discovery');
-  const candidates = await rows<CampaignRow>(env, "SELECT * FROM campaigns WHERE account_id=? AND status='live' AND live_version_id IS NOT NULL AND armed_at<=?", event.accountId, event.timestamp);
+  const candidates = await rows<CampaignRow>(env, "SELECT * FROM campaigns WHERE account_id=? AND status='live' AND live_version_id IS NOT NULL AND CAST(armed_at/1000 AS INTEGER)<=?", event.accountId, Math.floor(event.timestamp / 1000));
   const eligible: { campaign: CampaignRow; input: CampaignInput }[] = [];
   for (const campaign of candidates) {
     if (!campaign.live_version_id) continue;
@@ -157,11 +157,7 @@ export async function resumeRun(env: Env, runId: string) {
       if (journey.wake_at && journey.wake_at > time) return;
       const node = input.flow.nodes.find(node => node.id === journey.node_id);
       if (!node) throw new Error('Missing flow node');
-      if (journey.state === 'waiting') {
-        const expiry = person.last_interaction_at ? person.last_interaction_at + 86400000 : journey.comment_at + 7 * 86400000;
-        await run(env, 'UPDATE runs SET state=?,updated_at=? WHERE id=?', time >= expiry ? 'expired' : 'waiting', time, runId);
-        return;
-      }
+      if (journey.state === 'waiting') return;
       let next: string | null = null;
       switch (node.kind) {
         case 'message': case 'collect': {
@@ -203,6 +199,6 @@ export async function drain(env: Env) {
   const time = await now(env);
   const pending = await rows<{ id: string }>(env, "SELECT id FROM outbox WHERE state!='done' AND available_at<=? AND (state!='processing' OR lease_until<?) ORDER BY available_at LIMIT 100", time, time);
   for (const job of pending) await processJob(env, job.id);
-  const journeys = await rows<{ id: string }>(env, "SELECT id FROM runs WHERE state IN ('running','waiting','delayed') AND (wake_at IS NULL OR wake_at<=?) ORDER BY CASE WHEN state='waiting' THEN 1 ELSE 0 END,updated_at LIMIT 100", time);
+  const journeys = await rows<{ id: string }>(env, "SELECT id FROM runs WHERE state IN ('running','delayed') AND (wake_at IS NULL OR wake_at<=?) ORDER BY updated_at LIMIT 100", time);
   for (const journey of journeys) await resumeRun(env, journey.id);
 }

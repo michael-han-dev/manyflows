@@ -27,7 +27,7 @@ auth.use('*', async (c, next) => {
   }
   const token = getCookie(c, 'owner_session');
   if (token) {
-    try { const payload = await verify(c.env, token); if (typeof payload.sid === 'string' && await one(c.env, 'SELECT id FROM sessions WHERE id=? AND expires_at>?', payload.sid, Date.now())) c.set('sessionId', payload.sid); } catch { /* Invalid sessions remain unauthenticated. */ }
+    try { const payload = await verify(c.env, token); if (typeof payload.sid === 'string' && await one(c.env, 'SELECT id FROM sessions WHERE id=? AND expires_at>?', payload.sid, Date.now())) c.set('sessionId', payload.sid); } catch {}
   }
   await next();
 });
