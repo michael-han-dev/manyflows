@@ -1,13 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FlaskConical, MessageCircle, Plus, Send, Timer } from 'lucide-react';
 import type { Bootstrap, Message } from '../../shared/domain';
 import { date, Dialog, Empty, Field, Icon, Spinner, Status, time } from './ui';
 
-type Props = { data: Bootstrap; onClose: () => void; mutate: (path: string, body?: unknown) => Promise<void>; initialUsername?: string };
+type Props = { data: Bootstrap; onClose: () => void; mutate: (path: string, body?: unknown) => Promise<void>; initialUsername?: string; initialAccountId?: string };
 
-export function DemoStudio({ data, onClose, mutate, initialUsername }: Props) {
+export function DemoStudio({ data, onClose, mutate, initialUsername, initialAccountId }: Props) {
   const accounts = data.accounts.filter(account => account.mode === 'demo');
-  const [accountId, setAccountId] = useState(accounts[0]?.id ?? '');
+  const [accountId, setAccountId] = useState(initialAccountId || accounts[0]?.id || '');
   const [mediaId, setMediaId] = useState(data.media.find(item => item.accountId === accountId)?.id ?? '');
   const [username, setUsername] = useState(initialUsername ?? 'alex.creates');
   const [comment, setComment] = useState('GUIDE please!');
@@ -24,6 +24,9 @@ export function DemoStudio({ data, onClose, mutate, initialUsername }: Props) {
   const latest = [...messages].reverse().find(message => message.direction === 'out' && message.channel === 'dm');
   const media = data.media.filter(item => item.accountId === accountId);
   const chosenMedia = media.some(item => item.id === mediaId) ? mediaId : media[0]?.id ?? '';
+  useEffect(() => {
+    if (!accounts.some(account => account.id === accountId)) setAccountId(accounts[0]?.id ?? '');
+  }, [accounts, accountId]);
 
   async function act(label: string, path: string, body?: unknown) {
     setBusy(label); setError(null); setNotice(null);
