@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const root = process.cwd();
@@ -26,7 +26,8 @@ writeFileSync(configPath, JSON.stringify({
 }, null, 2));
 const wrangler = resolve('node_modules/wrangler/bin/wrangler.js');
 const state = resolve('.wrangler/e2e-state');
-const env = { ...process.env, WRANGLER_SEND_METRICS: 'false', CLOUDFLARE_ENV: 'e2e' };
+rmSync(state, { recursive: true, force: true });
+const env = { ...process.env, WRANGLER_SEND_METRICS: 'false', WRANGLER_LOG_PATH: resolve('.wrangler/logs'), CLOUDFLARE_ENV: 'e2e' };
 const migrate = spawnSync(process.execPath, [wrangler, 'd1', 'migrations', 'apply', 'DB', '--local', '--config', configPath, '--persist-to', state], { cwd: root, env, stdio: 'inherit' });
 if (migrate.status !== 0) process.exit(migrate.status ?? 1);
 const server = spawn(process.execPath, [wrangler, 'dev', '--local', '--port', '8788', '--config', configPath, '--persist-to', state], { cwd: root, env, stdio: 'inherit' });
