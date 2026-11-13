@@ -18,13 +18,20 @@ export async function graph(env: Env, account: AccountRow, path: string, params:
   if (!response.ok) { const error = graphError.safeParse(body); if (error.success && error.data.error.code === 190) await run(env, "UPDATE accounts SET status='reconnect' WHERE id=?", account.id); throw new ApiError(503, error.success ? `Instagram rejected the request (${error.data.error.code ?? response.status}).` : `Instagram returned HTTP ${response.status}.`); }
   return body;
 }
-export async function send(env: Env, account: AccountRow, action: { id: string; kind: string; commentId: string; payload: unknown }): Promise<SendResult> {
+export async function send(env: Env, account: AccountRow, action: { id: string; nodeId: string; kind: string; commentId: string; payload: unknown }): Promise<SendResult> {
   if (account.mode === 'demo') {
     if (!demoAllowed(env)) return { kind: 'rejected', retry: false, error: 'Demo sends are disabled outside localhost.' };
     const failure = await one<{ value: string }>(env, 'SELECT value FROM settings WHERE key=?', `failure:${account.id}`);
     if (failure) await run(env, 'DELETE FROM settings WHERE key=?', `failure:${account.id}`);
     const kind = failure?.value ?? 'accepted';
     await run(env, 'INSERT INTO demo_requests(id,account_id,action_id,request,outcome,created_at) VALUES(?,?,?,?,?,?)', uid(), account.id, action.id, JSON.stringify(action.payload), kind, await now(env));
+    const barrierKey = `send-barrier:${account.id}:${action.nodeId}`;
+    const blocked = await statement(env, "UPDATE settings SET value='blocked' WHERE key=? AND value='armed' RETURNING key", barrierKey).first();
+    if (blocked) {
+      const deadline = Date.now() + 15000;
+      while (Date.now() < deadline && (await one<{ value: string }>(env, 'SELECT value FROM settings WHERE key=?', barrierKey))?.value === 'blocked') await new Promise(resolve => setTimeout(resolve, 100));
+      await run(env, "UPDATE settings SET value='released' WHERE key=? AND value='blocked'", barrierKey);
+    }
     if (kind === 'uncertain') return { kind: 'uncertain', error: 'Simulated connection loss after send.' };
     if (kind === 'reject_once') return { kind: 'rejected', retry: true, error: 'Simulated rate limit rejection.' };
     if (kind === 'permanent') return { kind: 'rejected', retry: false, error: 'Simulated permission rejection.' };

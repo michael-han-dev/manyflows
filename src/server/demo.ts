@@ -33,7 +33,7 @@ demo.post('/api/demo/respond', async c => {
   await demoAccount(c.env, input.accountId);
   let payload = input.payload;
   if (input.buttonIndex !== undefined && !payload) {
-    const journey = requireValue(await one<RunRow>(c.env, `SELECT runs.* FROM runs JOIN contacts ON contacts.id=runs.contact_id WHERE runs.account_id=? AND contacts.instagram_id=? AND runs.state='waiting' ${input.runId ? 'AND runs.id=?' : ''} ORDER BY runs.created_at DESC LIMIT 1`, input.accountId, `demo-user:${input.username}`, ...(input.runId ? [input.runId] : [])), 'No waiting conversation found.');
+    const journey = requireValue(await one<RunRow>(c.env, `SELECT runs.* FROM runs JOIN contacts ON contacts.id=runs.contact_id WHERE runs.account_id=? AND contacts.instagram_id=? AND runs.state IN ('running','waiting') ${input.runId ? 'AND runs.id=?' : ''} ORDER BY runs.created_at DESC LIMIT 1`, input.accountId, `demo-user:${input.username}`, ...(input.runId ? [input.runId] : [])), 'No active conversation found.');
     payload = requireValue(await one<{ token: string }>(c.env, 'SELECT token FROM response_tokens WHERE run_id=? AND node_id=? AND choice=?', journey.id, journey.node_id, input.buttonIndex), 'This button is not a response button.').token;
   }
   const eventId = input.eventId ?? uid();
@@ -57,4 +57,16 @@ demo.post('/api/demo/failure', async c => {
   if (input.mode === 'none') await run(c.env, 'DELETE FROM settings WHERE key=?', `failure:${input.accountId}`);
   else await run(c.env, 'INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', `failure:${input.accountId}`, input.mode === 'rate_limit' ? 'reject_once' : input.mode);
   return c.json({ ok: true });
+});
+demo.post('/api/demo/send-barrier', async c => {
+  const input = z.object({ accountId: z.string(), nodeId: z.string(), mode: z.enum(['arm', 'release']) }).parse(await c.req.json());
+  await demoAccount(c.env, input.accountId);
+  await run(c.env, 'INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', `send-barrier:${input.accountId}:${input.nodeId}`, input.mode === 'arm' ? 'armed' : 'released');
+  return c.json({ ok: true });
+});
+demo.get('/api/demo/send-barrier', async c => {
+  const input = z.object({ accountId: z.string(), nodeId: z.string() }).parse(c.req.query());
+  await demoAccount(c.env, input.accountId);
+  const barrier = await one<{ value: string }>(c.env, 'SELECT value FROM settings WHERE key=?', `send-barrier:${input.accountId}:${input.nodeId}`);
+  return c.json({ state: barrier?.value ?? 'idle' });
 });
