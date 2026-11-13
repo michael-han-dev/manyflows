@@ -1,0 +1,24 @@
+{
+  "name": "comment-on-video",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "dev:api": "wrangler dev --local --port 8787",
+    "build": "vite build",
+    "check": "tsc --noEmit",
+    "db:migrate": "wrangler d1 migrations apply DB --local",
+    "test:e2e": "playwright test",
+    "deploy": "npm run build && wrangler deploy"
+  },
+  "dependencies": {
+    "@xyflow/react": "^12.12.1",
+    "hono": "^4.13.18",
+    "jose": "^6.2.17",
+    "lucide-react": "^1.72.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "zod": "^4.6.7"
+  }
+}
