@@ -4,6 +4,7 @@ import { campaignInputSchema, validateFlow, type Bootstrap, type Click, type Mes
 import { ApiError, account, action, baseUrl, buttons, campaign, campaignSelect, contact, demoAllowed, flowRun, graphVersion, media, now, one, requireValue, rows, run, statement, uid, type AccountRow, type ActionRow, type AppEnv, type CampaignRow, type PublishedCampaignRow, type ContactRow, type Env, type MediaRow, type RunRow } from './core';
 import { syncAccount } from './meta';
 import { dispatch, eventSchema } from './events';
+import { deleteStoredData } from './deletion';
 
 interface JobRow { id: string; account_id: string; kind: ProcessingJob['kind']; state: ProcessingJob['state']; attempts: number; error: string | null; available_at: number; received_at: number; }
 interface MessageRow { id: string; account_id: string; contact_id: string; run_id: string | null; direction: Message['direction']; channel: Message['channel']; text: string; buttons: string; status: Message['status']; created_at: number; }
@@ -122,5 +123,18 @@ api.post('/api/jobs/:id/retry', async c => {
     RETURNING id`, time, id, time, event.accountId, event.senderId, Date.now()).first();
   if (!reset) throw new ApiError(409, 'This job has an active lease or an uncertain send, or was already applied. Wait for active work to finish and review send outcomes before retrying.');
   c.executionCtx.waitUntil(dispatch(c.env));
+  return c.json({ ok: true });
+});
+
+api.delete('/api/contacts/:id', async c => {
+  z.object({ confirmation: z.literal('DELETE') }).parse(await c.req.json());
+  const person = requireValue(await one<ContactRow>(c.env, 'SELECT * FROM contacts WHERE id=?', c.req.param('id')), 'Contact not found.');
+  await deleteStoredData(c.env, { kind: 'contact', accountId: person.account_id, contactId: person.id, instagramId: person.instagram_id });
+  return c.json({ ok: true });
+});
+api.delete('/api/accounts/:id', async c => {
+  z.object({ confirmation: z.literal('DELETE') }).parse(await c.req.json());
+  const account = requireValue(await one<{ id: string }>(c.env, 'SELECT id FROM accounts WHERE id=?', c.req.param('id')), 'Account not found.');
+  await deleteStoredData(c.env, { kind: 'account', accountId: account.id });
   return c.json({ ok: true });
 });
