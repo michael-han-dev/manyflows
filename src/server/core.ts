@@ -16,7 +16,7 @@ export const baseUrl = (env: Env) => {
   if (url.username || url.password || url.pathname !== '/' || url.search || url.hash || (url.protocol !== 'https:' && !localHost(url.href))) throw new Error('PUBLIC_BASE_URL must be an HTTPS origin (HTTP localhost is supported).');
   return url.origin;
 };
-export const graphVersion = (env: Env) => /^v\d+\.0$/.test(env.GRAPH_VERSION ?? '') ? env.GRAPH_VERSION! : 'v27.0';
+export const graphVersion = (env: Env) => env.GRAPH_VERSION && /^v\d+\.0$/.test(env.GRAPH_VERSION) ? env.GRAPH_VERSION : 'v27.0';
 export const statement = (env: Env, sql: string, ...args: (string | number | null)[]) => env.DB.prepare(sql).bind(...args);
 export const one = <T>(env: Env, sql: string, ...args: (string | number | null)[]) => statement(env, sql, ...args).first<T>();
 export async function rows<T>(env: Env, sql: string, ...args: (string | number | null)[]) { return (await statement(env, sql, ...args).all<T>()).results; }
@@ -36,7 +36,7 @@ export interface RunRow { id: string; account_id: string; contact_id: string; ca
 export const flowRun = (r: RunRow): FlowRun => ({ id: r.id, accountId: r.account_id, contactId: r.contact_id, campaignId: r.campaign_id, versionId: r.version_id, commentId: r.comment_id, mediaId: r.media_id, nodeId: r.node_id, state: r.state, wakeAt: r.wake_at, createdAt: r.created_at, updatedAt: r.updated_at });
 export interface ActionRow { id: string; account_id: string; run_id: string; node_id: string; kind: Action['kind']; status: Action['status']; text: string; buttons: string; payload: string | null; attempts: number; error: string | null; available_at: number; created_at: number; updated_at: number; }
 export const action = (r: ActionRow): Action => ({ id: r.id, accountId: r.account_id, runId: r.run_id, nodeId: r.node_id, kind: r.kind, status: r.status, text: r.text, attempts: r.attempts, error: r.error, createdAt: r.created_at, updatedAt: r.updated_at });
-export interface AccountRow { id: string; username: string; name: string; mode: Account['mode']; status: Account['status']; avatar_url: string | null; token: string | null; token_expires_at: number | null; last_sync_at: number | null; permissions: string; sync_error: string | null; }
+export interface AccountRow { id: string; username: string; name: string; mode: Account['mode']; status: Account['status']; avatar_url: string | null; token: string | null; token_expires_at: number | null; last_sync_at: number | null; last_insights_at: number | null; permissions: string; sync_error: string | null; }
 export const account = (r: AccountRow): Account => ({ id: r.id, username: r.username, name: r.name, mode: r.mode, status: r.status, avatarUrl: r.avatar_url, tokenExpiresAt: r.token_expires_at, lastSyncAt: r.last_sync_at });
 export interface MediaRow { id: string; account_id: string; caption: string; type: Media['type']; permalink: string | null; thumbnail_url: string | null; published_at: number; reach: number | null; likes: number | null; comments: number | null; shares: number | null; saves: number | null; }
 export const media = (r: MediaRow): Media => ({ id: r.id, accountId: r.account_id, caption: r.caption, type: r.type, permalink: r.permalink, thumbnailUrl: r.thumbnail_url, publishedAt: r.published_at, reach: r.reach, likes: r.likes, comments: r.comments, shares: r.shares, saves: r.saves });

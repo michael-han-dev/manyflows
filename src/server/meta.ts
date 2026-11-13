@@ -44,7 +44,7 @@ export async function send(env: Env, account: AccountRow, action: { id: string; 
   } catch { return { kind: 'uncertain', error: 'The send response was lost. Check Instagram before any manual resend.' }; }
 }
 export async function bindNext(env: Env, accountId: string) {
-  const pending = await rows<CampaignRow>(env, "SELECT * FROM campaigns WHERE account_id=? AND status='live' AND json_extract(draft,'$.target.kind')='next' AND armed_at IS NOT NULL AND bound_media_id IS NULL", accountId);
+  const pending = await rows<CampaignRow>(env, "SELECT * FROM campaigns WHERE account_id=? AND status='live' AND live_target_kind='next' AND armed_at IS NOT NULL AND bound_media_id IS NULL", accountId);
   for (const campaign of pending) {
     const baseline = new Set(strings.parse(JSON.parse(campaign.baseline)));
     const publications = await rows<{ id: string }>(env, 'SELECT id FROM media WHERE account_id=? AND published_at>? ORDER BY published_at,id', accountId, campaign.armed_at);
@@ -63,18 +63,19 @@ export async function syncAccount(env: Env, account: AccountRow) {
       after = response.paging?.next ? response.paging.cursors?.after : undefined;
       if (!after) break;
     }
-    if (env.META_INSIGHTS_ENABLED === 'true') {
+    if (env.META_INSIGHTS_ENABLED === 'true' && (!account.last_insights_at || account.last_insights_at < time - 3600000)) {
+      await run(env, 'UPDATE accounts SET last_insights_at=?,sync_error=NULL WHERE id=?', time, account.id);
       const recent = await rows<{ id: string }>(env, 'SELECT id FROM media WHERE account_id=? ORDER BY published_at DESC LIMIT 25', account.id);
       for (const media of recent) {
         try {
           const result = insightsSchema.parse(await graph(env, account, `${media.id}/insights`, { metric: 'reach,likes,comments,shares,saved' }));
           const values = new Map(result.data.map(metric => [metric.name, metric.total_value?.value ?? metric.values?.[0]?.value ?? null]));
           await env.DB.batch([statement(env, 'UPDATE media SET reach=?,likes=COALESCE(?,likes),comments=COALESCE(?,comments),shares=?,saves=? WHERE account_id=? AND id=?', values.get('reach') ?? null, values.get('likes') ?? null, values.get('comments') ?? null, values.get('shares') ?? null, values.get('saved') ?? null, account.id, media.id), statement(env, 'INSERT INTO metric_snapshots(id,account_id,media_id,metrics,collected_at) VALUES(?,?,?,?,?)', uid(), account.id, media.id, JSON.stringify(Object.fromEntries(values)), time)]);
-        } catch { await run(env, 'UPDATE accounts SET sync_error=? WHERE id=?', 'Insights unavailable. Check granted permissions and supported media metrics.', account.id); }
+        } catch { await run(env, 'UPDATE accounts SET sync_error=? WHERE id=?', 'Insights unavailable. Check granted permissions and supported media metrics.', account.id); if (await one(env, "SELECT id FROM accounts WHERE id=? AND status='reconnect'", account.id)) break; }
       }
     }
     await bindNext(env, account.id);
-    await run(env, "UPDATE accounts SET last_sync_at=?,status='connected' WHERE id=?", time, account.id);
+    await run(env, "UPDATE accounts SET last_sync_at=? WHERE id=?", time, account.id);
   } catch (error) { await run(env, 'UPDATE accounts SET sync_error=? WHERE id=?', error instanceof ApiError ? error.message : 'Media sync failed. Try again.', account.id); throw error; }
 }
 export async function refreshTokens(env: Env) {
