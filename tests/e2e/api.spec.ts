@@ -107,6 +107,21 @@ test('comment journey collects email, delivers a tracked link, and deduplicates 
   expect(current.contacts.find(item => item.username === username)?.lastInteractionAt).toBe(before);
 });
 
+test('paced sends resume through the queue without a scheduler tick', async ({ request }) => {
+  const created = await campaign(request);
+  await post(request, '/api/demo/pacing', { accountId: 'demo-studio', milliseconds: 1000 });
+  try {
+    await comment(request, created.keyword, `paced-${randomUUID().slice(0, 8)}`);
+    await expect.poll(async () => {
+      const current = await state(request);
+      const run = current.runs.find(item => item.campaignId === created.id);
+      return current.messages.filter(item => item.runId === run?.id && item.direction === 'out' && item.channel === 'dm').length;
+    }).toBe(1);
+  } finally {
+    await post(request, '/api/demo/pacing', { accountId: 'demo-studio', milliseconds: 0 });
+  }
+});
+
 test('accounts remain isolated and the same username does not merge across accounts', async ({ request }) => {
   const one = await campaign(request);
   const two = await campaign(request, { accountId: 'demo-notes', matching: one.input.matching, publicReply: false });
@@ -235,6 +250,89 @@ test('an older message cannot answer a later email prompt', async ({ request }) 
   current = await state(request);
   expect(current.contacts.find(item => item.username === username)?.fields.email).toBeUndefined();
   expect(current.runs.find(item => item.id === run.id)?.state).toBe('waiting');
+});
+
+test('a button response survives a blocked opening send and concurrent scheduled work', async ({ request }) => {
+  const created = await campaign(request, { publicReply: false });
+  const username = `fast-${randomUUID().slice(0, 8)}`;
+  await post(request, '/api/demo/send-barrier', { accountId: 'demo-studio', nodeId: 'opening', mode: 'arm' });
+  const sending = request.post('/api/demo/comment', { data: { accountId: 'demo-studio', mediaId: 'demo-reel-guide', username, text: created.keyword } });
+  await expect.poll(async () => {
+    const response = await request.get('/api/demo/send-barrier?accountId=demo-studio&nodeId=opening');
+    return z.object({ state: z.string() }).parse(await response.json()).state;
+  }).toBe('blocked');
+  const run = (await state(request)).runs.find(item => item.campaignId === created.id);
+  if (!run) throw new Error('No blocked run');
+  await Promise.all([
+    post(request, '/api/demo/respond', { accountId: 'demo-studio', username, runId: run.id, buttonIndex: 0 }),
+    post(request, '/api/demo/tick'),
+  ]);
+  await post(request, '/api/demo/send-barrier', { accountId: 'demo-studio', nodeId: 'opening', mode: 'release' });
+  expect((await sending).ok()).toBeTruthy();
+  const clock = z.object({ now: z.number() }).parse(await (await post(request, '/api/demo/tick')).json()).now;
+  await post(request, '/api/demo/tick', { now: clock + 5000 });
+  const current = await state(request);
+  expect(current.runs.find(item => item.id === run.id)?.state).toBe('complete');
+  expect(current.messages.filter(item => item.runId === run.id && item.text === 'Here is your guide. Enjoy!')).toHaveLength(1);
+});
+
+test('an email arriving before the prompt send returns is retained and captured', async ({ request }) => {
+  const flow: CampaignInput['flow'] = { entry: 'opening', nodes: [
+    { id: 'opening', kind: 'message', text: 'Ready to subscribe?', buttons: [{ kind: 'reply', label: 'Yes', next: 'email' }], next: null },
+    { id: 'email', kind: 'collect', field: 'email', prompt: 'Which email?', next: 'done' },
+    { id: 'done', kind: 'end', outcome: 'complete' },
+  ] };
+  const created = await campaign(request, { flow, publicReply: false });
+  const username = `fast-email-${randomUUID().slice(0, 8)}`;
+  await comment(request, created.keyword, username);
+  const run = (await state(request)).runs.find(item => item.campaignId === created.id);
+  if (!run) throw new Error('No email run');
+  await post(request, '/api/demo/send-barrier', { accountId: 'demo-studio', nodeId: 'email', mode: 'arm' });
+  const sending = request.post('/api/demo/respond', { data: { accountId: 'demo-studio', username, runId: run.id, buttonIndex: 0 } });
+  await expect.poll(async () => {
+    const response = await request.get('/api/demo/send-barrier?accountId=demo-studio&nodeId=email');
+    return z.object({ state: z.string() }).parse(await response.json()).state;
+  }).toBe('blocked');
+  await post(request, '/api/demo/respond', { accountId: 'demo-studio', username, text: 'fast@example.com' });
+  await post(request, '/api/demo/send-barrier', { accountId: 'demo-studio', nodeId: 'email', mode: 'release' });
+  expect((await sending).ok()).toBeTruthy();
+  const clock = z.object({ now: z.number() }).parse(await (await post(request, '/api/demo/tick')).json()).now;
+  await post(request, '/api/demo/tick', { now: clock + 5000 });
+  const current = await state(request);
+  expect(current.contacts.find(item => item.username === username)?.fields.email).toBe('fast@example.com');
+  expect(current.runs.find(item => item.id === run.id)?.state).toBe('complete');
+});
+
+test('resource visits suppress the reminder without opening a new messaging window', async ({ request }) => {
+  const flow: CampaignInput['flow'] = { entry: 'opening', nodes: [
+    { id: 'opening', kind: 'message', text: 'Want the resource?', buttons: [{ kind: 'reply', label: 'Yes', next: 'resource' }], next: null },
+    { id: 'resource', kind: 'message', text: 'Your resource.', buttons: [{ kind: 'url', label: 'Read', url: 'https://www.notion.so/reminder-resource' }], next: 'delay' },
+    { id: 'delay', kind: 'delay', seconds: 60, next: 'check' },
+    { id: 'check', kind: 'condition', field: '$link_clicked', operator: 'is_set', value: '', yes: 'done', no: 'reminder' },
+    { id: 'reminder', kind: 'message', text: 'Remember your resource.', buttons: [], next: 'done' },
+    { id: 'done', kind: 'end', outcome: 'complete' },
+  ] };
+  const created = await campaign(request, { flow, publicReply: false });
+  for (const visited of [true, false]) {
+    const username = `reminder-${visited}-${randomUUID().slice(0, 8)}`;
+    await comment(request, created.keyword, username);
+    let current = await state(request);
+    const run = current.runs.find(item => item.campaignId === created.id && item.contactId === current.contacts.find(person => person.username === username)?.id);
+    if (!run) throw new Error('No reminder run');
+    await post(request, '/api/demo/respond', { accountId: 'demo-studio', username, runId: run.id, buttonIndex: 0 });
+    current = await state(request);
+    if (visited) {
+      const resource = current.messages.find(item => item.runId === run.id && item.text === 'Your resource.');
+      const link = resource?.buttons.find(button => button.kind === 'url');
+      if (!link || link.kind !== 'url') throw new Error('No reminder link');
+      expect((await request.get(link.url, { maxRedirects: 0 })).status()).toBe(302);
+    }
+    const clock = z.object({ now: z.number() }).parse(await (await post(request, '/api/demo/tick')).json()).now;
+    await post(request, '/api/demo/tick', { now: clock + 61000 });
+    current = await state(request);
+    expect(current.messages.filter(item => item.runId === run.id && item.text === 'Remember your resource.')).toHaveLength(visited ? 0 : 1);
+    expect(current.runs.find(item => item.id === run.id)?.state).toBe('complete');
+  }
 });
 
 test('uncertain external sends are visible and never automatically repeated', async ({ request }) => {

@@ -67,6 +67,7 @@ export interface Campaign {
   name: string;
   status: 'draft' | 'live' | 'paused';
   draft: CampaignInput;
+  publishedTarget: CampaignInput['target'] | null;
   liveVersionId: string | null;
   boundMediaId: string | null;
   armedAt: number | null;
@@ -151,6 +152,16 @@ export interface Configuration {
   graphVersion: string;
   warnings: string[];
 }
+export interface ProcessingJob {
+  id: string;
+  accountId: string;
+  kind: 'comment' | 'response';
+  state: 'pending' | 'queued' | 'processing' | 'failed';
+  attempts: number;
+  error: string | null;
+  availableAt: number;
+  receivedAt: number;
+}
 export interface Bootstrap {
   accounts: Account[];
   media: Media[];
@@ -160,6 +171,7 @@ export interface Bootstrap {
   runs: FlowRun[];
   actions: Action[];
   clicks: Click[];
+  jobs: ProcessingJob[];
   metrics: Metrics;
   configuration: Configuration;
 }
