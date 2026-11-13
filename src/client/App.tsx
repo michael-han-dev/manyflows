@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { Activity, ArrowRight, BarChart3, Check, ChevronDown, FlaskConical, Camera, LayoutDashboard, LockKeyhole, LogOut, Menu, MessageCircle, PanelLeftClose, Plus, RefreshCw, Settings2, ShieldCheck, Send, Users, X } from 'lucide-react';
 import { defaultCampaign, type Bootstrap, type Campaign, type CampaignInput, type Media } from '../shared/domain';
 import { ApiError, campaignSchema, getBootstrap, getSession, request } from './api';
@@ -36,10 +36,12 @@ export default function App() {
   if (period === 'custom') { if (from) query.set('from', String(new Date(`${from}T00:00:00`).getTime())); if (to) query.set('to', String(new Date(`${to}T23:59:59.999`).getTime())); }
   else if (period !== 'all') query.set('from', String(new Date(new Date().setHours(0, 0, 0, 0)).getTime() - (Number(period) - 1) * 86400000));
   const queryString = query.size ? `?${query.toString()}` : '';
+  const currentQuery = useRef(queryString);
+  currentQuery.current = queryString;
 
   const refresh = useCallback(async (quiet = false) => {
     if (!quiet) setRefreshing(true);
-    try { const fresh = await getBootstrap(queryString); setData(fresh); setError(null); return fresh; }
+    try { const fresh = await getBootstrap(queryString); if (currentQuery.current === queryString) { setData(fresh); if (!quiet) setError(null); } return fresh; }
     catch (error) { if (error instanceof ApiError && error.status === 401) { setAuth('unauthenticated'); setData(null); } else if (!quiet) setError(error instanceof Error ? error.message : 'The workspace could not be loaded.'); throw error; }
     finally { if (!quiet) setRefreshing(false); }
   }, [queryString]);
@@ -55,7 +57,11 @@ export default function App() {
 
   async function mutate(path: string, body?: unknown, method = 'POST') {
     setBusy(true);
-    try { const payload = await request(path, { method, body }); await refresh(true); return payload; }
+    try {
+      const payload = await request(path, { method, body });
+      await refresh(true).catch(error => { if (!(error instanceof ApiError && error.status === 401)) setError('The change was saved, but the workspace could not refresh. Use Refresh workspace to load the latest records.'); });
+      return payload;
+    }
     catch (error) { if (error instanceof ApiError && error.status === 401) setAuth('unauthenticated'); throw error; }
     finally { setBusy(false); }
   }
@@ -83,7 +89,7 @@ export default function App() {
     const campaign = campaignSchema.parse(await mutate(id ? `/api/campaigns/${encodeURIComponent(id)}` : '/api/campaigns', input, id ? 'PUT' : 'POST'));
     if (publish) {
       try { const live = campaignSchema.parse(await mutate(`/api/campaigns/${encodeURIComponent(campaign.id)}/publish`)); setEditor({ kind: 'existing', campaign: live }); }
-      catch (error) { setEditor({ kind: 'existing', campaign }); throw error; }
+      catch (error) { setEditor({ kind: 'existing', campaign }); setError(`Draft saved. Publishing failed. ${error instanceof Error ? error.message : 'Please review the campaign and try again.'}`); throw error; }
     } else setEditor({ kind: 'existing', campaign });
   }
 
