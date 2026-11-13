@@ -73,9 +73,9 @@ Example commands, to run only after selecting your account and matching the reso
 
 ```sh
 npx wrangler login
-npx wrangler d1 create relay
-npx wrangler queues create relay-outbox
-npx wrangler queues create relay-dead-letter
+npx wrangler d1 create comment-on-video
+npx wrangler queues create comment-on-video-outbox
+npx wrangler queues create comment-on-video-dead-letter
 npx wrangler secret put ADMIN_PASSWORD
 npx wrangler secret put SESSION_SECRET
 npx wrangler secret put TOKEN_ENCRYPTION_KEY

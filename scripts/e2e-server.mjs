@@ -27,7 +27,8 @@ writeFileSync(configPath, JSON.stringify({
 const wrangler = resolve('node_modules/wrangler/bin/wrangler.js');
 const state = resolve('.wrangler/e2e-state');
 rmSync(state, { recursive: true, force: true });
-const env = { ...process.env, WRANGLER_SEND_METRICS: 'false', WRANGLER_LOG_PATH: resolve('.wrangler/logs'), CLOUDFLARE_ENV: 'e2e' };
+const env = { ...process.env, WRANGLER_SEND_METRICS: 'false', WRANGLER_LOG_PATH: resolve('.wrangler/logs') };
+delete env.CLOUDFLARE_ENV;
 const migrate = spawnSync(process.execPath, [wrangler, 'd1', 'migrations', 'apply', 'DB', '--local', '--config', configPath, '--persist-to', state], { cwd: root, env, stdio: 'inherit' });
 if (migrate.status !== 0) process.exit(migrate.status ?? 1);
 const server = spawn(process.execPath, [wrangler, 'dev', '--local', '--port', '8788', '--config', configPath, '--persist-to', state], { cwd: root, env, stdio: 'inherit' });
