@@ -1,4 +1,5 @@
-import { ApiError, statement, type Env } from './core';
+import { digest } from './auth';
+import { ApiError, rows, statement, type Env } from './core';
 
 type DeletionScope = { kind: 'account'; accountId: string } | { kind: 'contact'; accountId: string; contactId: string; instagramId: string };
 export async function deleteStoredData(env: Env, scope: DeletionScope) {
@@ -11,6 +12,8 @@ export async function deleteStoredData(env: Env, scope: DeletionScope) {
     AND NOT EXISTS(SELECT 1 FROM outbox JOIN events ON events.id=outbox.event_id WHERE ${eventWhere} AND outbox.state='processing')`;
   const guardArgs = [...personArgs, Date.now(), ...personArgs, ...eventArgs];
   const guarded = (sql: string, args: (string | number)[]) => statement(env, `${sql} AND ${safe}`, ...args, ...guardArgs);
+  const legacy = await rows<{ id: string }>(env, `SELECT id FROM events WHERE ${eventWhere} AND receipt_hash IS NULL`, ...eventArgs);
+  const receipts = await Promise.all(legacy.map(event => digest(event.id)));
   const statements = [
     guarded(`DELETE FROM clicks WHERE ${personWhere}`, personArgs),
     guarded(`DELETE FROM links WHERE ${personWhere}`, personArgs),
@@ -25,6 +28,7 @@ export async function deleteStoredData(env: Env, scope: DeletionScope) {
     guarded(`DELETE FROM outbox WHERE event_id IN (SELECT id FROM events WHERE ${eventWhere})`, eventArgs),
     guarded(`DELETE FROM events WHERE ${eventWhere}`, eventArgs),
   ];
+  for (let start = 0; start < receipts.length; start += 1000) statements.unshift(guarded('INSERT OR IGNORE INTO event_receipts(digest) SELECT value FROM json_each(?) WHERE 1', [JSON.stringify(receipts.slice(start, start + 1000))]));
   if (scope.kind === 'account') {
     statements.push(
       guarded('DELETE FROM contacts WHERE account_id=?', [scope.accountId]),

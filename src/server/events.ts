@@ -33,10 +33,14 @@ export async function ingestSigned(env: Env, body: string | ArrayBuffer, signatu
       events.push({ kind: 'response', id: `${entry.id}:response:${identity}`, accountId: entry.id, senderId: value.sender.id, username: value.sender.id, timestamp: Math.min(time, eventTime(value.timestamp, time)), text: value.message?.text ?? value.postback?.title ?? '', payload: value.message?.quick_reply?.payload ?? value.postback?.payload ?? null });
     }
   }
-  for (const event of events) await env.DB.batch([
-    statement(env, 'INSERT OR IGNORE INTO events(id,account_id,payload,received_at) VALUES(?,?,?,?)', event.id, event.accountId, JSON.stringify(event), time),
-    statement(env, 'INSERT OR IGNORE INTO outbox(id,event_id,available_at) VALUES(?,?,?)', event.id, event.id, time),
-  ]);
+  for (const event of events) {
+    const receipt = await digest(event.id);
+    await env.DB.batch([
+      statement(env, 'INSERT OR IGNORE INTO events(id,account_id,payload,received_at,receipt_hash) SELECT ?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM event_receipts WHERE digest=?)', event.id, event.accountId, JSON.stringify(event), time, receipt, receipt),
+      statement(env, 'INSERT OR IGNORE INTO outbox(id,event_id,available_at) SELECT ?,?,? WHERE EXISTS(SELECT 1 FROM events WHERE id=?)', event.id, event.id, time, event.id),
+      statement(env, 'INSERT OR IGNORE INTO event_receipts(digest) VALUES(?)', receipt),
+    ]);
+  }
   return events.map(event => event.id);
 }
 export async function queueEvent(env: Env, id: string, delaySeconds = 0) {

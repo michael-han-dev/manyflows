@@ -11,6 +11,7 @@ const stateSchema = z.object({
   messages: z.array(z.object({ id: z.string(), runId: z.string().nullable(), direction: z.string(), channel: z.string(), text: z.string(), status: z.string(), buttons: z.array(buttonSchema), createdAt: z.number() })),
   actions: z.array(z.object({ id: z.string(), runId: z.string(), status: z.string(), attempts: z.number() })),
   clicks: z.array(z.object({ runId: z.string(), automated: z.boolean() })),
+  jobs: z.array(z.object({ id: z.string(), accountId: z.string(), state: z.string(), attempts: z.number(), availableAt: z.number(), error: z.string().nullable() })),
 });
 
 async function post(request: APIRequestContext, path: string, data: unknown = {}) {
@@ -370,4 +371,57 @@ test('delayed messages recheck the messaging window before sending', async ({ re
   current = await state(request);
   expect(current.runs.find(item => item.id === run.id)?.state).toBe('expired');
   expect(current.messages.some(item => item.runId === run.id && item.text === 'This message must expire.')).toBeFalsy();
+});
+
+test('an exhausted webhook job stays visible and recovers after the outage', async ({ request }) => {
+  const created = await campaign(request, { publicReply: false });
+  await post(request, '/api/demo/job-failure', { accountId: 'demo-studio', enabled: true });
+  const eventId = randomUUID();
+  await comment(request, created.keyword, `recover-${randomUUID().slice(0, 8)}`, { eventId });
+  const jobId = `demo-studio:comment:${eventId}`;
+  for (let attempt = 0; attempt < 22; attempt++) {
+    const job = (await state(request)).jobs.find(item => item.id === jobId);
+    if (!job || job.state === 'failed') break;
+    await post(request, '/api/demo/tick', { now: job.availableAt + 1 });
+  }
+  let current = await state(request);
+  const failed = current.jobs.find(item => item.id === jobId);
+  expect(failed?.state).toBe('failed');
+  expect(failed?.attempts).toBeGreaterThanOrEqual(20);
+  expect(failed?.error).toBeTruthy();
+  expect(current.runs.some(item => item.campaignId === created.id)).toBeFalsy();
+  await post(request, '/api/demo/job-failure', { accountId: 'demo-studio', enabled: false });
+  await post(request, `/api/jobs/${encodeURIComponent(jobId)}/retry`);
+  await post(request, '/api/demo/tick');
+  current = await state(request);
+  expect(current.runs.filter(item => item.campaignId === created.id)).toHaveLength(1);
+  expect(current.runs.find(item => item.campaignId === created.id)?.state).toBe('waiting');
+  expect(current.jobs.some(item => item.id === jobId)).toBeFalsy();
+});
+
+test('confirmed account deletion removes dependent data and leaves other accounts intact', async ({ request }) => {
+  const created = await campaign(request, { accountId: 'demo-notes', publicReply: false });
+  const username = `delete-account-${randomUUID().slice(0, 8)}`;
+  await post(request, '/api/demo/comment', { accountId: 'demo-notes', mediaId: 'demo-reel-notes', username, text: created.keyword });
+  await post(request, '/api/demo/respond', { accountId: 'demo-notes', username, buttonIndex: 0 });
+  const current = await state(request);
+  const run = current.runs.find(item => item.campaignId === created.id);
+  const resource = current.messages.find(item => item.runId === run?.id && item.text === 'Here is your guide. Enjoy!');
+  const link = resource?.buttons.find(button => button.kind === 'url');
+  if (!link || link.kind !== 'url') throw new Error('No account resource link');
+  await request.get(link.url, { maxRedirects: 0 });
+  expect((await request.delete('/api/accounts/demo-notes', { data: { confirmation: 'wrong' } })).status()).toBe(400);
+  const removed = await request.delete('/api/accounts/demo-notes', { data: { confirmation: 'DELETE' } });
+  expect(removed.ok(), await removed.text()).toBeTruthy();
+  expect((await request.get(link.url, { maxRedirects: 0 })).status()).toBe(404);
+  const after = await state(request);
+  expect(after.accounts.some(item => item.id === 'demo-notes')).toBeFalsy();
+  expect(after.accounts.some(item => item.id === 'demo-studio')).toBeTruthy();
+  expect(after.campaigns.some(item => item.accountId === 'demo-notes')).toBeFalsy();
+  expect(after.contacts.some(item => item.accountId === 'demo-notes')).toBeFalsy();
+  expect(after.runs.some(item => item.accountId === 'demo-notes')).toBeFalsy();
+  const exported = z.object({ versions: z.array(z.object({ campaignId: z.string() })), links: z.array(z.object({ accountId: z.string() })), metricSnapshots: z.array(z.object({ accountId: z.string() })) }).parse(await (await request.get('/api/export')).json());
+  expect(exported.versions.some(item => item.campaignId === created.id)).toBeFalsy();
+  expect(exported.links.some(item => item.accountId === 'demo-notes')).toBeFalsy();
+  expect(exported.metricSnapshots.some(item => item.accountId === 'demo-notes')).toBeFalsy();
 });
