@@ -5,10 +5,10 @@ import { buttonSchema, campaignInputSchema, defaultCampaign, type CampaignInput 
 
 const stateSchema = z.object({
   accounts: z.array(z.object({ id: z.string(), mode: z.string() })),
-  campaigns: z.array(z.object({ id: z.string(), accountId: z.string(), status: z.string(), liveVersionId: z.string().nullable(), boundMediaId: z.string().nullable(), draft: campaignInputSchema })),
+  campaigns: z.array(z.object({ id: z.string(), accountId: z.string(), status: z.string(), liveVersionId: z.string().nullable(), boundMediaId: z.string().nullable(), armedAt: z.number().nullable(), draft: campaignInputSchema })),
   contacts: z.array(z.object({ id: z.string(), accountId: z.string(), username: z.string(), fields: z.record(z.string(), z.string()), lastInteractionAt: z.number().nullable() })),
-  runs: z.array(z.object({ id: z.string(), accountId: z.string(), campaignId: z.string(), contactId: z.string(), versionId: z.string(), state: z.string(), nodeId: z.string().nullable(), wakeAt: z.number().nullable() })),
-  messages: z.array(z.object({ id: z.string(), runId: z.string().nullable(), direction: z.string(), channel: z.string(), text: z.string(), status: z.string(), buttons: z.array(buttonSchema) })),
+  runs: z.array(z.object({ id: z.string(), accountId: z.string(), campaignId: z.string(), contactId: z.string(), versionId: z.string(), state: z.string(), nodeId: z.string().nullable(), wakeAt: z.number().nullable(), createdAt: z.number() })),
+  messages: z.array(z.object({ id: z.string(), runId: z.string().nullable(), direction: z.string(), channel: z.string(), text: z.string(), status: z.string(), buttons: z.array(buttonSchema), createdAt: z.number() })),
   actions: z.array(z.object({ id: z.string(), runId: z.string(), status: z.string(), attempts: z.number() })),
   clicks: z.array(z.object({ runId: z.string(), automated: z.boolean() })),
 });
@@ -186,6 +186,55 @@ test('webhook verification rejects invalid signatures and accepts the configured
   const signature = createHmac('sha256', 'e2e-meta-secret').update(payload).digest('hex');
   const valid = await request.post('/webhooks/instagram', { data: payload, headers: { 'content-type': 'application/json', 'x-hub-signature-256': `sha256=${signature}` } });
   expect(valid.ok(), await valid.text()).toBeTruthy();
+});
+
+test('old contact interactions do not expire a new comment journey', async ({ request }) => {
+  const created = await campaign(request, { publicReply: false });
+  const username = `returning-${randomUUID().slice(0, 8)}`;
+  await comment(request, 'unmatched old conversation', username);
+  await post(request, '/api/demo/respond', { accountId: 'demo-studio', username, text: 'Old DM', timestamp: Date.now() - 30 * 86400000 });
+  await comment(request, created.keyword, username);
+  await post(request, '/api/demo/tick');
+  const run = (await state(request)).runs.find(item => item.campaignId === created.id);
+  expect(run?.state).toBe('waiting');
+  if (!run) throw new Error('No new journey for returning contact');
+  await post(request, '/api/demo/respond', { accountId: 'demo-studio', username, runId: run.id, buttonIndex: 0 });
+  expect((await state(request)).runs.find(item => item.id === run.id)?.state).toBe('complete');
+});
+
+test('next publication and comments support provider timestamps rounded to seconds', async ({ request }) => {
+  const created = await campaign(request, { target: { kind: 'next' }, publicReply: false });
+  const armedAt = (await state(request)).campaigns.find(item => item.id === created.id)?.armedAt;
+  if (!armedAt) throw new Error('No arming timestamp');
+  const rounded = Math.floor(armedAt / 1000) * 1000;
+  const mediaId = `rounded-${randomUUID().slice(0, 8)}`;
+  await post(request, '/api/demo/media', { accountId: 'demo-studio', id: mediaId, caption: 'Same-second publication', publishedAt: rounded, type: 'REELS' });
+  await comment(request, created.keyword, `rounded-${randomUUID().slice(0, 8)}`, { mediaId, timestamp: rounded });
+  const current = await state(request);
+  expect(current.campaigns.find(item => item.id === created.id)?.boundMediaId).toBe(mediaId);
+  expect(current.runs.some(item => item.campaignId === created.id)).toBeTruthy();
+});
+
+test('an older message cannot answer a later email prompt', async ({ request }) => {
+  const flow: CampaignInput['flow'] = { entry: 'opening', nodes: [
+    { id: 'opening', kind: 'message', text: 'Ready?', buttons: [{ kind: 'reply', label: 'Yes', next: 'email' }], next: null },
+    { id: 'email', kind: 'collect', field: 'email', prompt: 'Your email?', next: 'done' },
+    { id: 'done', kind: 'end', outcome: 'complete' },
+  ] };
+  const created = await campaign(request, { flow, publicReply: false });
+  const username = `ordered-${randomUUID().slice(0, 8)}`;
+  await comment(request, created.keyword, username);
+  const run = (await state(request)).runs.find(item => item.campaignId === created.id);
+  if (!run) throw new Error('No ordered conversation');
+  await post(request, '/api/demo/respond', { accountId: 'demo-studio', username, runId: run.id, buttonIndex: 0 });
+  let current = await state(request);
+  const prompt = current.messages.find(item => item.runId === run.id && item.text === 'Your email?');
+  if (!prompt || prompt.createdAt <= run.createdAt) throw new Error('Prompt must follow run creation');
+  const staleTime = Math.floor((run.createdAt + prompt.createdAt) / 2);
+  await post(request, '/api/demo/respond', { accountId: 'demo-studio', username, text: 'stale@example.com', timestamp: staleTime });
+  current = await state(request);
+  expect(current.contacts.find(item => item.username === username)?.fields.email).toBeUndefined();
+  expect(current.runs.find(item => item.id === run.id)?.state).toBe('waiting');
 });
 
 test('uncertain external sends are visible and never automatically repeated', async ({ request }) => {
