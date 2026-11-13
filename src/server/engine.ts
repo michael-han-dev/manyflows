@@ -216,7 +216,9 @@ export async function resumeRun(env: Env, runId: string) {
           break;
         }
         case 'condition': {
-          const personData = contact(person); const value = personData.fields[node.field] ?? '';
+          const personData = contact(person);
+          let value = personData.fields[node.field] ?? '';
+          if (node.field === '$link_clicked') value = await one(env, 'SELECT id FROM clicks WHERE run_id=? AND automated=0 LIMIT 1', runId) ? 'true' : '';
           const yes = node.operator === 'has_tag' ? personData.tags.includes(node.value) : node.operator === 'is_set' ? !!value : node.operator === 'equals' ? value.toLocaleLowerCase() === node.value.toLocaleLowerCase() : value.toLocaleLowerCase().includes(node.value.toLocaleLowerCase());
           next = yes ? node.yes : node.no; break;
         }
