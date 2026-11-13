@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { campaignInputSchema, validateFlow, type Bootstrap, type Click, type Message } from '../shared/domain';
-import { ApiError, account, action, baseUrl, buttons, campaign, contact, demoAllowed, flowRun, graphVersion, media, now, one, requireValue, rows, run, statement, uid, type AccountRow, type ActionRow, type AppEnv, type CampaignRow, type ContactRow, type Env, type MediaRow, type RunRow } from './core';
+import { ApiError, account, action, baseUrl, buttons, campaign, campaignSelect, contact, demoAllowed, flowRun, graphVersion, media, now, one, requireValue, rows, run, statement, uid, type AccountRow, type ActionRow, type AppEnv, type CampaignRow, type PublishedCampaignRow, type ContactRow, type Env, type MediaRow, type RunRow } from './core';
 import { syncAccount } from './meta';
 
 interface MessageRow { id: string; account_id: string; contact_id: string; run_id: string | null; direction: Message['direction']; channel: Message['channel']; text: string; buttons: string; status: Message['status']; created_at: number; }
@@ -17,7 +17,7 @@ export async function bootstrap(env: Env, query: { accountId?: string; from?: st
   const [accounts, medias, campaigns, contacts, runs, actions, messages, clicks, responses, emails] = await Promise.all([
     rows<AccountRow>(env, 'SELECT * FROM accounts ORDER BY mode,username'),
     rows<MediaRow>(env, `SELECT * FROM media WHERE ${accountWhere} ORDER BY published_at DESC ${limit(1000)}`, accountId, accountId),
-    rows<CampaignRow>(env, `SELECT * FROM campaigns WHERE ${accountWhere} ORDER BY created_at DESC`, accountId, accountId),
+    rows<PublishedCampaignRow>(env, `${campaignSelect} WHERE (? IS NULL OR campaigns.account_id=?) ORDER BY campaigns.created_at DESC`, accountId, accountId),
     rows<ContactRow>(env, `SELECT * FROM contacts WHERE ${accountWhere} ORDER BY created_at DESC ${limit(5000)}`, accountId, accountId),
     rows<RunRow>(env, `SELECT * FROM runs WHERE ${rangeWhere} ORDER BY created_at DESC ${limit(5000)}`, accountId, accountId, from, to),
     rows<ActionRow>(env, `SELECT * FROM actions WHERE ${rangeWhere} ORDER BY created_at DESC ${limit(10000)}`, accountId, accountId, from, to),
@@ -60,14 +60,14 @@ api.post('/api/campaigns', async c => {
   requireValue(await one(c.env, 'SELECT id FROM accounts WHERE id=?', input.accountId), 'Account not found.');
   const id = uid(), time = await now(c.env);
   await run(c.env, 'INSERT INTO campaigns(id,account_id,name,draft,created_at,updated_at) VALUES(?,?,?,?,?,?)', id, input.accountId, input.name, JSON.stringify(input), time, time);
-  return c.json(campaign(requireValue(await one<CampaignRow>(c.env, 'SELECT * FROM campaigns WHERE id=?', id))), 201);
+  return c.json(campaign(requireValue(await one<PublishedCampaignRow>(c.env, `${campaignSelect} WHERE campaigns.id=?`, id))), 201);
 });
 api.put('/api/campaigns/:id', async c => {
   const input = campaignInputSchema.parse(await c.req.json());
   const existing = requireValue(await one<CampaignRow>(c.env, 'SELECT * FROM campaigns WHERE id=?', c.req.param('id')));
   if (existing.account_id !== input.accountId) throw new ApiError(400, 'Duplicate the campaign to move it to another account.');
   await run(c.env, 'UPDATE campaigns SET name=?,draft=?,updated_at=? WHERE id=?', input.name, JSON.stringify(input), await now(c.env), existing.id);
-  return c.json(campaign(requireValue(await one<CampaignRow>(c.env, 'SELECT * FROM campaigns WHERE id=?', existing.id))));
+  return c.json(campaign(requireValue(await one<PublishedCampaignRow>(c.env, `${campaignSelect} WHERE campaigns.id=?`, existing.id))));
 });
 api.post('/api/campaigns/:id/publish', async c => {
   const existing = requireValue(await one<CampaignRow>(c.env, 'SELECT * FROM campaigns WHERE id=?', c.req.param('id')));
@@ -89,9 +89,9 @@ api.post('/api/campaigns/:id/publish', async c => {
   const prior = existing.live_version_id ? await one<{ input: string }>(c.env, 'SELECT input FROM versions WHERE id=?', existing.live_version_id) : null;
   const retainBinding = prior && campaignInputSchema.parse(JSON.parse(prior.input)).target.kind === 'next' && input.target.kind === 'next';
   await c.env.DB.batch([statement(c.env, 'INSERT INTO versions(id,campaign_id,input,created_at) VALUES(?,?,?,?)', versionId, existing.id, existing.draft, time), statement(c.env, "UPDATE campaigns SET status='live',live_target_kind=?,live_version_id=?,armed_at=?,baseline=?,bound_media_id=?,updated_at=? WHERE id=?", input.target.kind, versionId, retainBinding ? existing.armed_at : time, retainBinding ? existing.baseline : JSON.stringify(baseline), input.target.kind === 'specific' ? input.target.mediaId : retainBinding ? existing.bound_media_id : null, time, existing.id)]);
-  return c.json(campaign(requireValue(await one<CampaignRow>(c.env, 'SELECT * FROM campaigns WHERE id=?', existing.id))));
+  return c.json(campaign(requireValue(await one<PublishedCampaignRow>(c.env, `${campaignSelect} WHERE campaigns.id=?`, existing.id))));
 });
-api.post('/api/campaigns/:id/pause', async c => { requireValue(await one(c.env, 'SELECT id FROM campaigns WHERE id=?', c.req.param('id'))); await run(c.env, "UPDATE campaigns SET status='paused',updated_at=? WHERE id=?", await now(c.env), c.req.param('id')); return c.json(campaign(requireValue(await one<CampaignRow>(c.env, 'SELECT * FROM campaigns WHERE id=?', c.req.param('id'))))); });
+api.post('/api/campaigns/:id/pause', async c => { requireValue(await one(c.env, 'SELECT id FROM campaigns WHERE id=?', c.req.param('id'))); await run(c.env, "UPDATE campaigns SET status='paused',updated_at=? WHERE id=?", await now(c.env), c.req.param('id')); return c.json(campaign(requireValue(await one<PublishedCampaignRow>(c.env, `${campaignSelect} WHERE campaigns.id=?`, c.req.param('id'))))); });
 api.post('/api/campaigns/:id/duplicate', async c => {
   const existing = requireValue(await one<CampaignRow>(c.env, 'SELECT * FROM campaigns WHERE id=?', c.req.param('id')));
   const body = z.object({ accountId: z.string().optional() }).parse(await c.req.json().catch(() => ({})));
@@ -101,6 +101,6 @@ api.post('/api/campaigns/:id/duplicate', async c => {
   const copy = { ...input, accountId, name: `${input.name.slice(0, 113)} (copy)`, ...(accountId !== existing.account_id ? { target: { kind: 'all' as const } } : {}) };
   const id = uid(), time = await now(c.env);
   await run(c.env, 'INSERT INTO campaigns(id,account_id,name,draft,created_at,updated_at) VALUES(?,?,?,?,?,?)', id, accountId, copy.name, JSON.stringify(copy), time, time);
-  return c.json(campaign(requireValue(await one<CampaignRow>(c.env, 'SELECT * FROM campaigns WHERE id=?', id))), 201);
+  return c.json(campaign(requireValue(await one<PublishedCampaignRow>(c.env, `${campaignSelect} WHERE campaigns.id=?`, id))), 201);
 });
 api.post('/api/accounts/:id/sync', async c => { const account = requireValue(await one<AccountRow>(c.env, 'SELECT * FROM accounts WHERE id=?', c.req.param('id'))); await syncAccount(c.env, account); return c.json({ ok: true }); });
