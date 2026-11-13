@@ -74,5 +74,6 @@ demo.post('/api/demo/pacing', async c => {
   const input = z.object({ accountId: z.string(), milliseconds: z.number().int().min(0).max(5000) }).parse(await c.req.json());
   await demoAccount(c.env, input.accountId);
   await run(c.env, 'INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', `pacing:${input.accountId}`, String(input.milliseconds));
+  if (input.milliseconds === 0) await run(c.env, 'UPDATE accounts SET next_send_at=0 WHERE id=?', input.accountId);
   return c.json({ ok: true });
 });
