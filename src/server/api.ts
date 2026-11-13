@@ -7,21 +7,22 @@ import { syncAccount } from './meta';
 interface MessageRow { id: string; account_id: string; contact_id: string; run_id: string | null; direction: Message['direction']; channel: Message['channel']; text: string; buttons: string; status: Message['status']; created_at: number; }
 interface ClickRow { id: string; account_id: string; campaign_id: string; run_id: string; contact_id: string; link_id: string; automated: number; created_at: number; }
 const date = (value: string | undefined, fallback: number) => { if (!value) return fallback; const parsed = /^\d+$/.test(value) ? Number(value) : Date.parse(value); if (!Number.isFinite(parsed)) throw new ApiError(400, 'Invalid date range.'); return parsed; };
-export async function bootstrap(env: Env, query: { accountId?: string; from?: string; to?: string } = {}): Promise<Bootstrap> {
+export async function bootstrap(env: Env, query: { accountId?: string; from?: string; to?: string } = {}, mode: 'dashboard' | 'export' = 'dashboard'): Promise<Bootstrap> {
   const accountId = query.accountId && query.accountId !== 'all' ? query.accountId : null;
   const from = date(query.from, 0), to = date(query.to, 9007199254740991);
   if (from > to) throw new ApiError(400, 'Start date must be before end date.');
   const accountWhere = '(? IS NULL OR account_id=?)';
   const rangeWhere = `${accountWhere} AND created_at>=? AND created_at<=?`;
+  const limit = (size: number) => mode === 'dashboard' ? `LIMIT ${size}` : '';
   const [accounts, medias, campaigns, contacts, runs, actions, messages, clicks, responses, emails] = await Promise.all([
     rows<AccountRow>(env, 'SELECT * FROM accounts ORDER BY mode,username'),
-    rows<MediaRow>(env, `SELECT * FROM media WHERE ${accountWhere} ORDER BY published_at DESC LIMIT 1000`, accountId, accountId),
+    rows<MediaRow>(env, `SELECT * FROM media WHERE ${accountWhere} ORDER BY published_at DESC ${limit(1000)}`, accountId, accountId),
     rows<CampaignRow>(env, `SELECT * FROM campaigns WHERE ${accountWhere} ORDER BY created_at DESC`, accountId, accountId),
-    rows<ContactRow>(env, `SELECT * FROM contacts WHERE ${accountWhere} ORDER BY created_at DESC LIMIT 5000`, accountId, accountId),
-    rows<RunRow>(env, `SELECT * FROM runs WHERE ${rangeWhere} ORDER BY created_at DESC LIMIT 5000`, accountId, accountId, from, to),
-    rows<ActionRow>(env, `SELECT * FROM actions WHERE ${rangeWhere} ORDER BY created_at DESC LIMIT 10000`, accountId, accountId, from, to),
-    rows<MessageRow>(env, `SELECT * FROM messages WHERE ${rangeWhere} ORDER BY created_at ASC LIMIT 10000`, accountId, accountId, from, to),
-    rows<ClickRow>(env, `SELECT * FROM clicks WHERE ${rangeWhere} ORDER BY created_at DESC LIMIT 10000`, accountId, accountId, from, to),
+    rows<ContactRow>(env, `SELECT * FROM contacts WHERE ${accountWhere} ORDER BY created_at DESC ${limit(5000)}`, accountId, accountId),
+    rows<RunRow>(env, `SELECT * FROM runs WHERE ${rangeWhere} ORDER BY created_at DESC ${limit(5000)}`, accountId, accountId, from, to),
+    rows<ActionRow>(env, `SELECT * FROM actions WHERE ${rangeWhere} ORDER BY created_at DESC ${limit(10000)}`, accountId, accountId, from, to),
+    rows<MessageRow>(env, `SELECT * FROM messages WHERE ${rangeWhere} ORDER BY created_at ASC ${limit(10000)}`, accountId, accountId, from, to),
+    rows<ClickRow>(env, `SELECT * FROM clicks WHERE ${rangeWhere} ORDER BY created_at DESC ${limit(10000)}`, accountId, accountId, from, to),
     rows<{ contact_id: string }>(env, `SELECT DISTINCT contact_id FROM responses WHERE ${rangeWhere}`, accountId, accountId, from, to),
     rows<{ contact_id: string }>(env, `SELECT DISTINCT contact_id FROM email_captures WHERE ${rangeWhere}`, accountId, accountId, from, to),
   ]);
@@ -29,7 +30,7 @@ export async function bootstrap(env: Env, query: { accountId?: string; from?: st
   const warnings = accounts.flatMap(account => account.sync_error ? [`@${account.username}: ${account.sync_error}`] : []);
   if (!env.META_APP_ID || !env.META_APP_SECRET) warnings.push('Meta is not configured. Local simulations do not prove live Instagram access.');
   if (env.META_INSIGHTS_ENABLED !== 'true') warnings.push('Instagram insights are disabled. Unavailable content metrics are shown as unknown.');
-  if (runs.length === 5000 || messages.length === 10000 || actions.length === 10000) warnings.push('This view reached its record limit. Select a narrower date range.');
+  if (mode === 'dashboard' && (medias.length === 1000 || contacts.length === 5000 || runs.length === 5000 || messages.length === 10000 || actions.length === 10000 || clicks.length === 10000)) warnings.push('This view reached its record limit. Select a narrower date range or export all records.');
   return {
     accounts: accounts.map(account), media: medias.map(media), campaigns: campaigns.map(campaign), contacts: contacts.map(contact), runs: runs.map(flowRun), actions: actions.map(action),
     messages: messages.map(item => ({ id: item.id, accountId: item.account_id, contactId: item.contact_id, runId: item.run_id, direction: item.direction, channel: item.channel, text: item.text, buttons: buttons.parse(JSON.parse(item.buttons)), status: item.status, createdAt: item.created_at })),
@@ -41,9 +42,18 @@ export async function bootstrap(env: Env, query: { accountId?: string; from?: st
 export const api = new Hono<AppEnv>();
 api.get('/api/bootstrap', async c => c.json(await bootstrap(c.env, c.req.query())));
 api.get('/api/export', async c => {
-  const data = await bootstrap(c.env, c.req.query());
+  const query = c.req.query();
+  const data = await bootstrap(c.env, query, 'export');
+  const accountId = query.accountId && query.accountId !== 'all' ? query.accountId : null;
+  const [versions, links, responses, emailCaptures, snapshots] = await Promise.all([
+    rows<{ id: string; campaignId: string; input: string; createdAt: number }>(c.env, 'SELECT versions.id,versions.campaign_id AS campaignId,versions.input,versions.created_at AS createdAt FROM versions JOIN campaigns ON campaigns.id=versions.campaign_id WHERE (? IS NULL OR campaigns.account_id=?) ORDER BY versions.created_at', accountId, accountId),
+    rows(c.env, 'SELECT token,account_id AS accountId,campaign_id AS campaignId,run_id AS runId,contact_id AS contactId,action_id AS actionId,destination,choice FROM links WHERE (? IS NULL OR account_id=?)', accountId, accountId),
+    rows(c.env, 'SELECT event_id AS eventId,account_id AS accountId,contact_id AS contactId,run_id AS runId,created_at AS createdAt FROM responses WHERE (? IS NULL OR account_id=?) ORDER BY created_at', accountId, accountId),
+    rows(c.env, 'SELECT event_id AS eventId,account_id AS accountId,contact_id AS contactId,created_at AS createdAt FROM email_captures WHERE (? IS NULL OR account_id=?) ORDER BY created_at', accountId, accountId),
+    rows<{ id: string; accountId: string; mediaId: string; metrics: string; collectedAt: number }>(c.env, 'SELECT id,account_id AS accountId,media_id AS mediaId,metrics,collected_at AS collectedAt FROM metric_snapshots WHERE (? IS NULL OR account_id=?) ORDER BY collected_at', accountId, accountId),
+  ]);
   c.header('Content-Disposition', 'attachment; filename="instagram-automation-export.json"');
-  return c.json({ exportedAt: await now(c.env), ...data });
+  return c.json({ exportedAt: await now(c.env), ...data, versions: versions.map(version => ({ ...version, input: campaignInputSchema.parse(JSON.parse(version.input)) })), links, responses, emailCaptures, metricSnapshots: snapshots.map(snapshot => ({ ...snapshot, metrics: z.record(z.string(), z.number().nullable()).parse(JSON.parse(snapshot.metrics)) })) });
 });
 api.post('/api/campaigns', async c => {
   const input = campaignInputSchema.parse(await c.req.json());
