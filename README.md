@@ -1,2 +1,101 @@
-# commentOnVideo
-manychat clone
+# Relay
+
+A private Instagram automation workspace for accounts you own and manage. Build comment-to-DM campaigns, edit branching flows, store conversations and leads, and attribute resource-link clicks to campaigns.
+
+The application uses TypeScript, React, Cloudflare Workers, D1, and Queues. [the_plan.md](the_plan.md) records the product plan. [implement.md](implement.md) records execution progress and verification limits.
+
+## Run locally
+
+Use a current Node.js release supported by the installed Wrangler and Vite versions.
+
+```sh
+npm ci
+npm run setup:local
+npm run db:migrate
+npm run dev:api
+```
+
+Open `http://127.0.0.1:8787` and sign in using `ADMIN_PASSWORD` from `.dev.vars`. Local setup creates random credentials and preserves an existing configuration. The file is ignored by Git.
+
+Wrangler runs a local Worker and local D1 storage. These commands do not create a hosted database or use a Cloudflare account. Data remains under `.wrangler` in this checkout.
+
+For frontend hot reload, run `npm run dev` in another terminal and open the printed Vite URL. Vite proxies API requests to the local Worker.
+
+Use the demo setup control to add simulated accounts and content, then create and publish a campaign. The developer tools submit comments and responses through the backend without contacting Instagram. Simulated messages are not real Instagram deliveries.
+
+## Verify end to end
+
+```sh
+npx playwright install chromium
+npm run check
+npm run test:e2e
+```
+
+The suite starts a separate local Worker on port 8788 and applies real SQL migrations to isolated D1 storage under `.wrangler/e2e-state`. Test credentials live in a generated ignored configuration. The suite does not change `.dev.vars`.
+
+The application, database, webhook verification, flow engine, and redirect routes run normally. Only the external Meta service is simulated for demo accounts. Browser tests drive the rendered dashboard. No unit tests are included.
+
+Failure reports and traces are written to `playwright-report` and `test-results`. Run `npx playwright show-report` to inspect the report.
+
+## Connect Instagram
+
+The local demo does not require a Meta developer account. Live integration requires a custom Meta app and authorization for each managed Instagram professional account.
+
+Configure the app for the Instagram Login integration used by this implementation. Required scopes are `instagram_business_basic`, `instagram_business_manage_comments`, and `instagram_business_manage_messages`. Insights access needs verification for the selected setup before enabling it. Do not mix permissions from different API setups.
+
+Register the application's HTTPS callback and webhook URLs in Meta's dashboard. Settings shows the URLs derived from `PUBLIC_BASE_URL`:
+
+- `/auth/instagram/callback` completes account authorization.
+- `/webhooks/instagram` verifies subscriptions and receives signed events.
+
+Meta needs a public HTTPS endpoint for live webhooks. Use the finished pilot deployment or an explicitly configured development tunnel for that step.
+
+Set `META_APP_ID`, `META_APP_SECRET`, and `META_WEBHOOK_VERIFY_TOKEN` for the custom app. Keep tokens and secrets out of source control. Use the account connection control to authorize access. The server encrypts stored account tokens with `TOKEN_ENCRYPTION_KEY`.
+
+Verify comments and messaging with an actual person outside the app's developer roles and complete any required review. Test the initial private reply, response-button events, subsequent messages, media access, and insights. Own-account use does not establish all required permissions.
+
+Keep ManyChat connected during investigation. Before enabling overlapping production automations, pause the corresponding ManyChat campaign and verify Meta's conversation-routing configuration. Cut over one account at a time.
+
+## Deploy to your Cloudflare account
+
+Local development and the end-to-end suite do not create hosted resources. Deployment requires separate owner setup.
+
+1. Authenticate Wrangler to the intended Cloudflare account. Confirm the account before creating resources.
+2. Create D1 and replace the placeholder database ID in `wrangler.jsonc`. Set an explicit account ID when you have access to more than one account.
+3. Create the queue and dead-letter queue named in `wrangler.jsonc`.
+4. Set `PUBLIC_BASE_URL` to the deployment's HTTPS origin and disable `DEMO_MODE`.
+5. Set new production values for `ADMIN_PASSWORD`, `SESSION_SECRET`, and `TOKEN_ENCRYPTION_KEY`, plus Meta app credentials and the verification token. Preserve the encryption key during redeployments.
+6. Apply remote migrations, build, and deploy.
+7. Configure Meta's callback and webhook subscription, then authorize the pilot account.
+8. Verify the live pilot before migrating other accounts.
+
+Example commands, to run only after selecting your account and matching the resource names to the checked-in configuration:
+
+```sh
+npx wrangler login
+npx wrangler d1 create relay
+npx wrangler queues create relay-outbox
+npx wrangler queues create relay-dead-letter
+npx wrangler secret put ADMIN_PASSWORD
+npx wrangler secret put SESSION_SECRET
+npx wrangler secret put TOKEN_ENCRYPTION_KEY
+npx wrangler secret put META_APP_ID
+npx wrangler secret put META_APP_SECRET
+npx wrangler secret put META_WEBHOOK_VERIFY_TOKEN
+npx wrangler d1 migrations apply DB --remote
+npm run deploy
+```
+
+Authentication, remote resource creation, secrets, migration, and deployment are not performed automatically.
+
+## Operational behavior
+
+Drafts and immutable publications are separate. Existing runs use their original flow version. Each account has its own contacts, campaigns, media bindings, credentials, and sending allowance.
+
+The webhook receiver checks signatures over the original request body and stores events with recoverable work records. Storage deduplicates events and action claims. Unknown external send outcomes remain visible as uncertain instead of being automatically repeated.
+
+Message eligibility is checked when sending. Initial private replies and continuing DMs have different rules. An external website visit does not open the Instagram messaging window.
+
+Resource buttons use saved, opaque tracking URLs. The redirect records a visit and forwards the recipient to the destination, such as Notion. Link previews can create automated visits. Forwarded links remain attributed to the original message rather than a verified visitor identity.
+
+Dashboard sends mean API-accepted messages unless another delivery status is available. Content engagement and automation response rates have separate denominators. Missing insights remain unavailable.

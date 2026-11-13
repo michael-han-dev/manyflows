@@ -5,11 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "dev:api": "wrangler dev --local --port 8787",
+    "dev:api": "npm run build && wrangler dev --local --port 8787",
+    "setup:local": "node scripts/setup-local.mjs",
     "build": "vite build",
     "check": "tsc --noEmit",
     "db:migrate": "wrangler d1 migrations apply DB --local",
-    "test:e2e": "playwright test",
+    "test:e2e": "npm run build && playwright test",
     "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
