@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { campaignInputSchema, type Button, type CampaignInput, type FlowNode } from '../shared/domain';
 import { digest } from './auth';
 import { baseUrl, buttons, contact, demoAllowed, now, one, rows, run, statement, uid, type AccountRow, type ActionRow, type CampaignRow, type ContactRow, type Env, type RunRow } from './core';
-import { eventSchema, type Event } from './events';
+import { eventSchema, queueEvent, type Event } from './events';
 import { bindNext, send, syncAccount } from './meta';
 
 function matches(input: CampaignInput, text: string) {
@@ -111,7 +111,9 @@ export async function processJob(env: Env, id: string) {
       if (event.kind === 'comment') await processComment(env, event);
       else if (await processResponse(env, event) === 'deferred') {
         const exhausted = claimed.attempts >= 20;
-        await run(env, "UPDATE outbox SET state=?,available_at=?,lease_until=NULL,error=? WHERE id=?", exhausted ? 'failed' : 'pending', time + Math.min(60000, 1000 * 2 ** Math.min(claimed.attempts - 1, 6)), exhausted ? 'Response could not acquire the conversation after 20 attempts.' : 'Waiting for the conversation to finish its current step.', id);
+        const delaySeconds = Math.min(60, 2 ** Math.min(claimed.attempts - 1, 6));
+        await run(env, "UPDATE outbox SET state=?,available_at=?,lease_until=NULL,error=? WHERE id=?", exhausted ? 'failed' : 'pending', time + delaySeconds * 1000, exhausted ? 'Response could not acquire the conversation after 20 attempts.' : 'Waiting for the conversation to finish its current step.', id);
+        if (!exhausted) await queueEvent(env, id, delaySeconds);
         return;
       }
     }
@@ -156,9 +158,14 @@ async function executeAction(env: Env, item: ActionRow, journey: RunRow, person:
   const expires = item.kind === 'private' ? journey.comment_at + 7 * 86400000 : item.kind === 'dm' ? (person.last_interaction_at ?? 0) + 86400000 : Infinity;
   if (expires <= time) { await env.DB.batch([statement(env, "UPDATE runs SET state='expired',updated_at=? WHERE id=?", time, journey.id), statement(env, "UPDATE actions SET status='failed',error='Messaging window expired.',updated_at=? WHERE id=?", time, item.id)]); return 'stop'; }
   const account = await one<AccountRow>(env, 'SELECT * FROM accounts WHERE id=?', journey.account_id); if (!account) throw new Error('Missing account');
-  const pacing = demoAllowed(env) && account.mode === 'demo' ? 0 : 1100;
+  const demoPacing = demoAllowed(env) && account.mode === 'demo' ? await one<{ value: string }>(env, 'SELECT value FROM settings WHERE key=?', `pacing:${account.id}`) : null;
+  const pacing = demoAllowed(env) && account.mode === 'demo' ? Number(demoPacing?.value ?? 0) : 5000;
   const slot = await statement(env, 'UPDATE accounts SET next_send_at=? WHERE id=? AND next_send_at<=? RETURNING id', time + pacing, account.id, time).first();
-  if (!slot) { await run(env, 'UPDATE runs SET wake_at=? WHERE id=?', time + 1500, journey.id); return 'wait'; }
+  if (!slot) {
+    const pending = await one<{ next_send_at: number }>(env, 'SELECT next_send_at FROM accounts WHERE id=?', account.id);
+    await run(env, 'UPDATE runs SET wake_at=? WHERE id=?', pending?.next_send_at ?? time + 5000, journey.id);
+    return 'wait';
+  }
   const payload = await preparePayload(env, item, journey, person);
   const claimed = await statement(env, "UPDATE actions SET status='executing',attempts=attempts+1,started_at=?,updated_at=? WHERE id=? AND status='pending' RETURNING id", time, time, item.id).first(); if (!claimed) return 'wait';
   const result = await send(env, account, { id: item.id, nodeId: item.node_id, kind: item.kind, commentId: journey.comment_id, payload });
@@ -228,7 +235,12 @@ export async function resumeRun(env: Env, runId: string) {
       await run(env, "UPDATE runs SET node_id=?,state='running',wake_at=NULL,updated_at=? WHERE id=?", next, time, runId);
       journey = { ...journey, node_id: next, state: 'running', wake_at: null };
     }
-  } finally { await releaseRun(env, runId, lease.token); }
+  } finally {
+    await releaseRun(env, runId, lease.token);
+    const waiting = await one<{ wake_at: number }>(env, "SELECT wake_at FROM runs WHERE id=? AND state IN ('running','delayed') AND wake_at IS NOT NULL", runId);
+    const delay = waiting ? waiting.wake_at - await now(env) : 0;
+    if (delay > 0 && delay <= 60000) await env.OUTBOX.send({ kind: 'run', id: runId }, { delaySeconds: Math.ceil(delay / 1000) });
+  }
 }
 export async function drain(env: Env) {
   const time = await now(env);

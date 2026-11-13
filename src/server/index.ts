@@ -3,9 +3,9 @@ import { ZodError } from 'zod';
 import { auth, requireOwner } from './auth';
 import { api } from './api';
 import { demo } from './demo';
-import { ApiError, demoAllowed, now, one, rows, run, uid, type AccountRow, type AppEnv, type Env } from './core';
+import { ApiError, demoAllowed, now, one, rows, run, uid, type AccountRow, type AppEnv, type Env, type QueueJob } from './core';
 import { dispatch, ingestSigned } from './events';
-import { drain, processJob } from './engine';
+import { drain, processJob, resumeRun } from './engine';
 import { connections, refreshTokens, syncAccount } from './meta';
 
 const app = new Hono<AppEnv>();
@@ -46,7 +46,7 @@ app.all('/api/*', c => c.json({ error: 'Endpoint not found.' }, 404));
 app.get('*', c => c.env.ASSETS.fetch(c.req.raw));
 export default {
   fetch: app.fetch,
-  async queue(batch: MessageBatch<{ id: string }>, env: Env) { for (const message of batch.messages) { try { await processJob(env, message.body.id); message.ack(); } catch { message.retry({ delaySeconds: 60 }); } } },
+  async queue(batch: MessageBatch<QueueJob>, env: Env) { for (const message of batch.messages) { try { if (message.body.kind === 'run') await resumeRun(env, message.body.id); else await processJob(env, message.body.id); message.ack(); } catch { message.retry({ delaySeconds: 60 }); } } },
   async scheduled(_event: ScheduledController, env: Env, context: ExecutionContext) {
     context.waitUntil((async () => {
       if (env.DEMO_MODE === 'true' && !demoAllowed(env)) return;

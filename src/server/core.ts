@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import { campaignInputSchema, buttonSchema, type Campaign, type Contact, type FlowRun, type Action, type Account, type Media } from '../shared/domain';
 
+export type QueueJob = { kind: 'event'; id: string } | { kind: 'run'; id: string };
 export interface Env {
-  DB: D1Database; OUTBOX: Queue<{ id: string }>; ASSETS: Fetcher;
+  DB: D1Database; OUTBOX: Queue<QueueJob>; ASSETS: Fetcher;
   ADMIN_PASSWORD?: string; SESSION_SECRET?: string; TOKEN_ENCRYPTION_KEY?: string;
   DEMO_MODE?: string; PUBLIC_BASE_URL?: string; GRAPH_VERSION?: string;
   META_APP_ID?: string; META_APP_SECRET?: string; META_WEBHOOK_VERIFY_TOKEN?: string; META_INSIGHTS_ENABLED?: string;

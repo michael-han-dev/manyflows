@@ -39,11 +39,14 @@ export async function ingestSigned(env: Env, body: string | ArrayBuffer, signatu
   ]);
   return events.map(event => event.id);
 }
+export async function queueEvent(env: Env, id: string, delaySeconds = 0) {
+  await env.OUTBOX.send({ kind: 'event', id }, { delaySeconds });
+  await run(env, "UPDATE outbox SET state='queued',lease_until=? WHERE id=? AND state IN ('pending','queued')", await now(env) + delaySeconds * 1000 + 120000, id);
+}
 export async function dispatch(env: Env) {
   const time = await now(env);
   const pending = await rows<{ id: string }>(env, "SELECT id FROM outbox WHERE (state='pending' AND available_at<=?) OR (state='queued' AND lease_until<?) ORDER BY available_at LIMIT 100", time, time);
   for (const job of pending) {
-    await env.OUTBOX.send({ id: job.id });
-    await run(env, "UPDATE outbox SET state='queued',lease_until=? WHERE id=? AND state IN ('pending','queued')", time + 120000, job.id);
+    await queueEvent(env, job.id);
   }
 }
