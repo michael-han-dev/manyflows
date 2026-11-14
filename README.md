@@ -23,20 +23,6 @@ For frontend hot reload, run `npm run dev` in another terminal and open the prin
 
 Use the demo setup control to add simulated accounts and content, then create and publish a campaign. The developer tools submit comments and responses through the backend without contacting Instagram. Simulated messages are not real Instagram deliveries.
 
-## Verify end to end
-
-```sh
-npx playwright install chromium
-npm run check
-npm run test:e2e
-```
-
-The suite starts a separate local Worker on port 8788 and applies real SQL migrations to isolated D1 storage under `.wrangler/e2e-state`. Test credentials live in a generated ignored configuration. The suite does not change `.dev.vars`.
-
-The application, database, webhook verification, flow engine, and redirect routes run normally. Only the external Meta service is simulated for demo accounts. Browser tests drive the rendered dashboard. The restart check stops and restarts a separate local Worker on port 8789 with its own D1 state, then resumes a waiting conversation. No unit tests are included.
-
-Failure reports and traces are written to `playwright-report` and `test-results`. Run `npx playwright show-report` to inspect the report.
-
 ## Connect Instagram
 
 The local demo does not require a Meta developer account. Live integration requires a custom Meta app and authorization for each managed Instagram professional account.
