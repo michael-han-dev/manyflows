@@ -1,4 +1,4 @@
-# Relay
+# Manyflows
 
 A private Instagram automation workspace for accounts you own and manage. Build comment-to-DM campaigns, edit branching flows, store conversations and leads, and attribute resource-link clicks to campaigns.
 
