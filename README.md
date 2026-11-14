@@ -4,6 +4,8 @@ A private Instagram automation workspace for accounts you own and manage. Build 
 
 The application uses TypeScript, React, Cloudflare Workers, D1, and Queues.
 
+The interface uses tweakcn's Sage Garden dark palette, Antic, and JetBrains Mono. Fonts are served by the application. Theme and font notices are included in `licenses` and `public/fonts`.
+
 ## Run locally
 
 Use a current Node.js release supported by the installed Wrangler and Vite versions.

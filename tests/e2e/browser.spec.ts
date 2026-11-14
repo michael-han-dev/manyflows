@@ -31,7 +31,11 @@ async function signIn(page: Page) {
 test('owner creates and publishes a campaign with five reply variants and a working conversation', async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/');
+  await expect(page).toHaveTitle('Manyflows · Instagram workspace');
+  await page.screenshot({ path: testInfo.outputPath('login-desktop.png'), fullPage: true, animations: 'disabled' });
   await signIn(page);
+  await page.screenshot({ path: testInfo.outputPath('overview-desktop.png'), fullPage: true, animations: 'disabled' });
   await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: /^Campaigns/ }).click();
   await page.getByRole('button', { name: 'Create campaign', exact: true }).first().click();
   const name = `Browser campaign ${Date.now()}`;
@@ -47,7 +51,7 @@ test('owner creates and publishes a campaign with five reply variants and a work
   await page.getByRole('textbox', { name: 'Resource URL', exact: true }).fill('https://www.notion.so/browser-guide');
   await page.getByRole('tab', { name: 'Visual flow', exact: true }).click();
   await expect(page.getByText('Conversation canvas', { exact: true })).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath('flow-editor.png'), fullPage: true });
+  await page.screenshot({ path: testInfo.outputPath('flow-editor.png'), fullPage: true, animations: 'disabled' });
   await page.getByRole('tab', { name: 'Preview', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Send me the guide', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Send me the guide', exact: true }).click();
@@ -79,7 +83,7 @@ test('owner creates and publishes a campaign with five reply variants and a work
   await page.reload();
   await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: /^Campaigns/ }).click();
   await expect(page.getByText(name, { exact: true })).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath('campaigns-desktop.png'), fullPage: true });
+  await page.screenshot({ path: testInfo.outputPath('campaigns-desktop.png'), fullPage: true, animations: 'disabled' });
   expect(errors).toEqual([]);
 });
 
@@ -89,12 +93,13 @@ test('dashboard navigation remains usable on a narrow screen', async ({ page }, 
   const widths = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, document: document.documentElement.scrollWidth }));
   expect(widths.document).toBeLessThanOrEqual(widths.viewport + 1);
   await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
+  await page.screenshot({ path: testInfo.outputPath('navigation-mobile.png'), fullPage: true, animations: 'disabled' });
   await page.getByRole('button', { name: 'Contacts', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Contacts', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath('settings-mobile.png'), fullPage: true });
+  await page.screenshot({ path: testInfo.outputPath('settings-mobile.png'), fullPage: true, animations: 'disabled' });
   const finalWidths = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, document: document.documentElement.scrollWidth }));
   expect(finalWidths.document).toBeLessThanOrEqual(finalWidths.viewport + 1);
 });
@@ -130,7 +135,9 @@ test('contact CSV neutralizes a collected spreadsheet formula', async ({ page })
   await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Contacts', exact: true }).click();
   const downloading = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export CSV', exact: true }).click();
-  const path = await (await downloading).path();
+  const download = await downloading;
+  expect(download.suggestedFilename()).toBe('manyflows-contacts.csv');
+  const path = await download.path();
   if (!path) throw new Error('CSV download was not saved');
   const csv = await readFile(path, 'utf8');
   expect(csv).toContain('"\'=HYPERLINK(');
