@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 
-const config = JSON.parse(await readFile('wrangler.jsonc', 'utf8'));
+const config = JSON.parse(await readFile(process.argv[2] ?? 'wrangler.jsonc', 'utf8'));
 const origin = new URL(config.vars.PUBLIC_BASE_URL).origin;
 assert.equal(new URL(origin).protocol, 'https:');
 const html = await readFile('dist/index.html', 'utf8');

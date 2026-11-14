@@ -48,9 +48,11 @@ Keep ManyChat connected during investigation. Before enabling overlapping produc
 
 Local development and the end-to-end suite do not create hosted resources. Deployment requires separate owner setup.
 
+The checked-in `wrangler.jsonc` contains placeholder hosting values. Copy it to the ignored `wrangler.production.jsonc` for production, and keep your account ID, database ID, and deployment URL in that local file.
+
 1. Authenticate Wrangler to the intended Cloudflare account. Confirm the account before creating resources.
-2. Confirm the account and database IDs in `wrangler.jsonc`. When deploying to another account, create D1 and replace those IDs.
-3. Create the queue and dead-letter queue named in `wrangler.jsonc` only if they do not already exist.
+2. Set the account and database IDs in `wrangler.production.jsonc`. Create D1 if needed.
+3. Create the queue and dead-letter queue named in `wrangler.production.jsonc` only if they do not already exist.
 4. Set `PUBLIC_BASE_URL` to the deployment's HTTPS origin and disable `DEMO_MODE`.
 5. Set new production values for `ADMIN_PASSWORD`, `SESSION_SECRET`, and `TOKEN_ENCRYPTION_KEY`, plus Meta app credentials and the verification token. Preserve the encryption key during redeployments.
 6. For the first deployment, set `workers_dev` and `preview_urls` to `false`. Apply remote migrations, build, and deploy.
@@ -59,21 +61,22 @@ Local development and the end-to-end suite do not create hosted resources. Deplo
 9. Configure Meta's callback and webhook subscription, then authorize the pilot account.
 10. Verify the live pilot before migrating other accounts.
 
-Example commands, to run only after selecting your account and matching the resource names to the checked-in configuration:
+Example commands, to run only after selecting your account and matching the resource names to your production configuration:
 
 ```sh
 npx wrangler login
 npx wrangler d1 create comment-on-video
 npx wrangler queues create comment-on-video-outbox
 npx wrangler queues create comment-on-video-dead-letter
-npx wrangler secret put ADMIN_PASSWORD
-npx wrangler secret put SESSION_SECRET
-npx wrangler secret put TOKEN_ENCRYPTION_KEY
-npx wrangler secret put META_APP_ID
-npx wrangler secret put META_APP_SECRET
-npx wrangler secret put META_WEBHOOK_VERIFY_TOKEN
-npx wrangler d1 migrations apply DB --remote
-npm run deploy
+npx wrangler secret put ADMIN_PASSWORD --config wrangler.production.jsonc
+npx wrangler secret put SESSION_SECRET --config wrangler.production.jsonc
+npx wrangler secret put TOKEN_ENCRYPTION_KEY --config wrangler.production.jsonc
+npx wrangler secret put META_APP_ID --config wrangler.production.jsonc
+npx wrangler secret put META_APP_SECRET --config wrangler.production.jsonc
+npx wrangler secret put META_WEBHOOK_VERIFY_TOKEN --config wrangler.production.jsonc
+npx wrangler d1 migrations apply DB --remote --config wrangler.production.jsonc
+npm run build
+npx wrangler deploy --config wrangler.production.jsonc
 ```
 
 Authentication, remote resource creation, secrets, migration, and deployment are not performed automatically.
@@ -93,7 +96,7 @@ Give that application a Bypass policy including Everyone. These paths serve Meta
 
 Cloudflare Access checks identity first. The application then requires its separate `ADMIN_PASSWORD`. Production credentials are saved locally in the ignored `.dev.vars.production.json` with owner-only file permissions and stored remotely as Worker secrets. Preserve the token encryption key when redeploying.
 
-After deployment, run `npm run test:hosted` to check anonymous dashboard and API protection, public recipient-link routing, and webhook rejection. If the local production secret file or `META_WEBHOOK_VERIFY_TOKEN` is available, it also verifies Meta's subscription challenge. The checks do not send Instagram messages or change campaigns. Owner sign-in and real Instagram delivery need separate verification.
+After deployment, run `npm run test:hosted -- wrangler.production.jsonc` to check anonymous dashboard and API protection, public recipient-link routing, and webhook rejection. If the local production secret file or `META_WEBHOOK_VERIFY_TOKEN` is available, it also verifies Meta's subscription challenge. The checks do not send Instagram messages or change campaigns. Owner sign-in and real Instagram delivery need separate verification.
 
 ## Operational behavior
 
