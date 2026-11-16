@@ -1,42 +1,74 @@
-import { defaultCampaign, type Flow, type FlowNode } from '../../shared/domain';
+import { defaultCampaign, DEFAULT_REMINDER_SECONDS, MAX_MESSAGE_BUTTONS, type Button, type Flow, type FlowNode } from '../../shared/domain';
 
+type UrlButton = Extract<Button, { kind: 'url' }>;
 export type TemplateModel = {
   opening: boolean; openingText: string; openingButton: string;
-  resourceText: string; resourceLabel: string; resourceUrl: string;
-  email: boolean; emailPrompt: string; reminder: boolean; reminderText: string; reminderSeconds: number;
+  email: boolean; emailPrompt: string;
+  follow: boolean; followText: string; followButton: string;
+  resourceText: string; resourceLinks: UrlButton[];
+  reminder: boolean; reminderText: string; reminderSeconds: number;
 };
 
+const defaults: TemplateModel = {
+  opening: false, openingText: 'Hi! Would you like the resource?', openingButton: 'Send it to me',
+  email: false, emailPrompt: 'What is your email address?',
+  follow: false, followText: 'Follow our account, then let us know when you are ready.', followButton: 'I followed',
+  resourceText: '', resourceLinks: [], reminder: false,
+  reminderText: 'Just a reminder to take a look when you have a moment.', reminderSeconds: DEFAULT_REMINDER_SECONDS,
+};
+
+function sameStoredValue(left: unknown, right: unknown): boolean {
+  if (left === right) return true;
+  if (Array.isArray(left) && Array.isArray(right)) return left.length === right.length && left.every((item, index) => sameStoredValue(item, right[index]));
+  if (!left || !right || typeof left !== 'object' || typeof right !== 'object' || Array.isArray(left) || Array.isArray(right)) return false;
+  const leftEntries = Object.entries(left).sort(([a], [b]) => a.localeCompare(b));
+  const rightEntries = Object.entries(right).sort(([a], [b]) => a.localeCompare(b));
+  return sameStoredValue(leftEntries, rightEntries);
+}
+
 export function readTemplate(flow: Flow): TemplateModel | null {
-  const opening = flow.nodes.find(node => node.id === 'opening');
-  const resource = flow.nodes.find(node => node.id === 'resource');
-  const email = flow.nodes.find(node => node.id === 'email');
-  const delay = flow.nodes.find(node => node.id === 'reminder_delay');
-  const reminderCheck = flow.nodes.find(node => node.id === 'reminder_check');
-  const reminder = flow.nodes.find(node => node.id === 'reminder');
-  const done = flow.nodes.find(node => node.id === 'done');
-  const allowed = new Set(['opening', 'resource', 'email', 'reminder_delay', 'reminder_check', 'reminder', 'done']);
-  if (flow.nodes.some(node => !allowed.has(node.id)) || resource?.kind !== 'message' || done?.kind !== 'end' || done.outcome !== 'complete') return null;
-  const link = resource.buttons[0];
-  if (resource.buttons.length !== 1 || link?.kind !== 'url') return null;
-  if (opening && (opening.kind !== 'message' || opening.buttons.length !== 1 || opening.buttons[0]?.kind !== 'reply' || opening.next !== null)) return null;
-  if (email && (email.kind !== 'collect' || email.field !== 'email' || email.next !== 'resource' || !opening)) return null;
-  if (opening?.kind === 'message' && opening.buttons[0]?.kind === 'reply' && opening.buttons[0].next !== (email ? 'email' : 'resource')) return null;
-  if (flow.entry !== (opening ? 'opening' : 'resource')) return null;
-  if ((delay || reminder || reminderCheck) && (!opening || delay?.kind !== 'delay' || reminder?.kind !== 'message' || delay.next !== 'reminder_check' || reminder.next !== 'done' || reminder.buttons.length !== 0 || reminderCheck?.kind !== 'condition' || reminderCheck.field !== '$link_clicked' || reminderCheck.operator !== 'is_set' || reminderCheck.yes !== 'done' || reminderCheck.no !== 'reminder')) return null;
-  if (resource.next !== (delay ? 'reminder_delay' : 'done')) return null;
-  return {
-    opening: Boolean(opening), openingText: opening?.kind === 'message' ? opening.text : 'Hey! Want the free guide?', openingButton: opening?.kind === 'message' ? opening.buttons[0]?.label ?? 'Send me the guide' : 'Send me the guide',
-    resourceText: resource.text, resourceLabel: link.label, resourceUrl: link.url,
-    email: Boolean(email), emailPrompt: email?.kind === 'collect' ? email.prompt : 'Where should I send future resources? Reply with your email.',
-    reminder: Boolean(delay), reminderText: reminder?.kind === 'message' ? reminder.text : 'A quick reminder to check out your guide. Hope it helps!', reminderSeconds: delay?.kind === 'delay' ? delay.seconds : 3600,
+  const byId = new Map(flow.nodes.map(node => [node.id, node]));
+  if (byId.size !== flow.nodes.length) return null;
+  const opening = byId.get('opening');
+  const email = byId.get('email');
+  const follow = byId.get('follow');
+  const resource = byId.get('resource');
+  const delay = byId.get('reminder_delay');
+  const reminder = byId.get('reminder');
+  if (resource?.kind !== 'message' || resource.buttons.length > MAX_MESSAGE_BUTTONS || resource.buttons.some(button => button.kind !== 'url')) return null;
+  const resourceLinks = resource.buttons.filter((button): button is UrlButton => button.kind === 'url');
+  const openingButton = opening?.kind === 'message' ? opening.buttons[0] : undefined;
+  const followButton = follow?.kind === 'message' ? follow.buttons[0] : undefined;
+  if (opening && (opening.kind !== 'message' || openingButton?.kind !== 'reply')) return null;
+  if (email && email.kind !== 'collect') return null;
+  if (follow && (follow.kind !== 'message' || followButton?.kind !== 'reply')) return null;
+  if (delay && delay.kind !== 'delay') return null;
+  if (reminder && reminder.kind !== 'message') return null;
+  const model: TemplateModel = {
+    ...defaults,
+    opening: Boolean(opening), openingText: opening?.kind === 'message' ? opening.text : defaults.openingText,
+    openingButton: openingButton?.kind === 'reply' ? openingButton.label : defaults.openingButton,
+    email: Boolean(email), emailPrompt: email?.kind === 'collect' ? email.prompt : defaults.emailPrompt,
+    follow: Boolean(follow), followText: follow?.kind === 'message' ? follow.text : defaults.followText,
+    followButton: followButton?.kind === 'reply' ? followButton.label : defaults.followButton,
+    resourceText: resource.text, resourceLinks,
+    reminder: Boolean(delay), reminderText: reminder?.kind === 'message' ? reminder.text : defaults.reminderText,
+    reminderSeconds: delay?.kind === 'delay' ? delay.seconds : defaults.reminderSeconds,
   };
+  const written = writeTemplate(model);
+  if (!sameStoredValue(flow.entry, written.entry) || flow.nodes.length !== written.nodes.length) return null;
+  if (!written.nodes.every(node => sameStoredValue(byId.get(node.id), node))) return null;
+  const flowKeys = Object.keys(flow).sort();
+  if (!sameStoredValue(flowKeys, ['entry', 'nodes'])) return null;
+  return model;
 }
 
 export function writeTemplate(model: TemplateModel): Flow {
   const nodes: FlowNode[] = [];
-  if (model.opening) nodes.push({ id: 'opening', kind: 'message', text: model.openingText, buttons: [{ kind: 'reply', label: model.openingButton, next: model.email ? 'email' : 'resource' }], next: null });
-  if (model.opening && model.email) nodes.push({ id: 'email', kind: 'collect', field: 'email', prompt: model.emailPrompt, next: 'resource' });
-  nodes.push({ id: 'resource', kind: 'message', text: model.resourceText, buttons: [{ kind: 'url', label: model.resourceLabel, url: model.resourceUrl }], next: model.opening && model.reminder ? 'reminder_delay' : 'done' });
+  if (model.opening) nodes.push({ id: 'opening', kind: 'message', text: model.openingText, buttons: [{ kind: 'reply', label: model.openingButton, next: model.email ? 'email' : model.follow ? 'follow' : 'resource' }], next: null });
+  if (model.opening && model.email) nodes.push({ id: 'email', kind: 'collect', field: 'email', prompt: model.emailPrompt, next: model.follow ? 'follow' : 'resource' });
+  if (model.opening && model.follow) nodes.push({ id: 'follow', kind: 'message', text: model.followText, buttons: [{ kind: 'reply', label: model.followButton, next: 'resource' }], next: null });
+  nodes.push({ id: 'resource', kind: 'message', text: model.resourceText, buttons: model.resourceLinks, next: model.opening && model.reminder ? 'reminder_delay' : 'done' });
   if (model.opening && model.reminder) {
     nodes.push({ id: 'reminder_delay', kind: 'delay', seconds: model.reminderSeconds, next: 'reminder_check' });
     nodes.push({ id: 'reminder_check', kind: 'condition', field: '$link_clicked', operator: 'is_set', value: '', yes: 'done', no: 'reminder' });
@@ -54,7 +86,7 @@ export function newStep(kind: FlowNode['kind'], id: string, destination: string)
     case 'collect': return { id, kind, field: 'email', prompt: 'What is your email address?', next: destination };
     case 'condition': return { id, kind, field: 'email', operator: 'is_set', value: '', yes: destination, no: destination };
     case 'action': return { id, kind, tag: 'interested', next: destination };
-    case 'delay': return { id, kind, seconds: 3600, next: destination };
+    case 'delay': return { id, kind, seconds: DEFAULT_REMINDER_SECONDS, next: destination };
     case 'end': return { id, kind, outcome: 'complete' };
   }
 }

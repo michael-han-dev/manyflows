@@ -1,3 +1,3 @@
-The Clean Slate colour and typography tokens are adapted from [tweakcn](https://github.com/jnsahaj/tweakcn), licensed under Apache License 2.0. The original license is included in `tweakcn-LICENSE.txt`. Manyflows uses the dark preset and maps its existing interface styles to the theme tokens.
+The Clean Slate colour tokens are adapted from [tweakcn](https://github.com/jnsahaj/tweakcn), licensed under Apache License 2.0. The original license is included in `tweakcn-LICENSE.txt`.
 
-Inter and JetBrains Mono are distributed under the SIL Open Font License. Their license and copyright notices are included beside the self-hosted font files in `public/fonts`.
+Geist and Geist Mono are distributed under the SIL Open Font License. The fonts come from the official [Geist font package](https://github.com/vercel/geist-font). Their license and copyright notices are included in `public/fonts/Geist-OFL.txt` beside the self-hosted font files.

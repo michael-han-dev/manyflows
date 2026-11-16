@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { campaignInputSchema, type Button, type CampaignInput, type FlowNode } from '../shared/domain';
+import { MESSAGING_WINDOW_SECONDS, PRIVATE_REPLY_WINDOW_SECONDS, campaignInputSchema, type Button, type CampaignInput } from '../shared/domain';
 import { digest } from './auth';
 import { accountSelect, baseUrl, buttons, contact, demoAllowed, now, one, rows, run, statement, uid, type AccountRow, type ActionRow, type CampaignRow, type ContactRow, type Env, type RunRow } from './core';
 import { eventSchema, queueEvent, type Event } from './events';
@@ -158,7 +158,7 @@ async function executeAction(env: Env, item: ActionRow, journey: RunRow, person:
     return 'stop';
   }
   if (item.available_at > time) { await run(env, 'UPDATE runs SET wake_at=? WHERE id=?', item.available_at, journey.id); return 'wait'; }
-  const expires = item.kind === 'private' ? journey.comment_at + 7 * 86400000 : item.kind === 'dm' ? (person.last_interaction_at ?? 0) + 86400000 : Infinity;
+  const expires = item.kind === 'private' ? journey.comment_at + PRIVATE_REPLY_WINDOW_SECONDS * 1000 : item.kind === 'dm' ? (person.last_interaction_at ?? 0) + MESSAGING_WINDOW_SECONDS * 1000 : Infinity;
   if (expires <= time) { await env.DB.batch([statement(env, "UPDATE runs SET state='expired',updated_at=? WHERE id=?", time, journey.id), statement(env, "UPDATE actions SET status='failed',error='Messaging window expired.',updated_at=? WHERE id=?", time, item.id)]); return 'stop'; }
   const account = await one<AccountRow>(env, `${accountSelect} WHERE id=?`, journey.account_id); if (!account) throw new Error('Missing account');
   const demoPacing = demoAllowed(env) && account.mode === 'demo' ? await one<{ value: string }>(env, 'SELECT value FROM settings WHERE key=?', `pacing:${account.id}`) : null;

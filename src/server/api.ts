@@ -78,7 +78,6 @@ api.post('/api/campaigns/:id/publish', async c => {
   const existing = requireValue(await one<CampaignRow>(c.env, 'SELECT * FROM campaigns WHERE id=?', c.req.param('id')));
   const input = campaignInputSchema.parse(JSON.parse(existing.draft));
   const errors = validateFlow(input);
-  for (const node of input.flow.nodes) if (node.kind === 'message' && node.buttons.length && node.text.length > 640) errors.push(`Step ${node.id} must use at most 640 characters with buttons.`);
   if (input.target.kind === 'specific' && !await one(c.env, 'SELECT id FROM media WHERE account_id=? AND id=?', input.accountId, input.target.mediaId)) errors.push('The selected media does not belong to this account.');
   const account = requireValue(await one<AccountRow>(c.env, `${accountSelect} WHERE id=?`, input.accountId));
   if (account.status !== 'connected') errors.push('Reconnect this account before publishing.');

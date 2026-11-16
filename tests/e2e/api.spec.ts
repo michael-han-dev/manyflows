@@ -2,6 +2,7 @@ import { createHmac, randomUUID } from 'node:crypto';
 import { expect, test, type APIRequestContext } from '@playwright/test';
 import { z } from 'zod';
 import { buttonSchema, campaignInputSchema, defaultCampaign, type CampaignInput } from '../../src/shared/domain';
+import { readTemplate, writeTemplate } from '../../src/client/components/flow-model';
 
 const stateSchema = z.object({
   accounts: z.array(z.object({ id: z.string(), mode: z.string() })),
@@ -333,6 +334,55 @@ test('resource visits suppress the reminder without opening a new messaging wind
     current = await state(request);
     expect(current.messages.filter(item => item.runId === run.id && item.text === 'Remember your resource.')).toHaveLength(visited ? 0 : 1);
     expect(current.runs.find(item => item.id === run.id)?.state).toBe('complete');
+  }
+});
+
+test('guided email and follow confirmation gate multiple resources and reminders', async ({ request }) => {
+  const initial = readTemplate(defaultCampaign('demo-studio').flow);
+  if (!initial) throw new Error('Default campaign is not a guided flow.');
+  const destinations = ['https://example.com/guide', 'https://example.com/checklist', 'https://example.com/course'];
+  const flow = writeTemplate({ ...initial, opening: true, openingText: 'Opening permission', email: true, emailPrompt: 'Email before the resource?', follow: true, followText: 'Please follow, then confirm.', followButton: 'I am following', resourceText: 'Your resources are ready.', resourceLinks: destinations.map((url, index) => ({ kind: 'url', label: `Resource ${index + 1}`, url })), reminder: true, reminderText: 'Remember your resources.', reminderSeconds: 60 });
+  const created = await campaign(request, { flow, publicReply: false });
+  await post(request, '/api/demo/pacing', { accountId: 'demo-studio', milliseconds: 0 });
+  for (const visitedLink of [-1, 0, 1, 2]) {
+    const username = `guided-${randomUUID().slice(0, 8)}`;
+    await comment(request, created.keyword, username);
+    let current = await state(request);
+    const person = current.contacts.find(item => item.username === username);
+    const journey = current.runs.find(item => item.campaignId === created.id && item.contactId === person?.id);
+    if (!journey) throw new Error('Guided campaign did not start.');
+    const sent = () => current.messages.filter(item => item.runId === journey.id && item.direction === 'out' && item.channel === 'dm');
+    expect(sent().map(item => item.text)).toEqual(['Opening permission']);
+    await post(request, '/api/demo/respond', { accountId: 'demo-studio', username, runId: journey.id, buttonIndex: 0 });
+    current = await state(request);
+    expect(current.runs.find(item => item.id === journey.id)?.nodeId).toBe('email');
+    expect(sent().some(item => item.text === 'Please follow, then confirm.')).toBeFalsy();
+    await post(request, '/api/demo/respond', { accountId: 'demo-studio', username, text: 'not-an-email' });
+    expect((await state(request)).runs.find(item => item.id === journey.id)?.nodeId).toBe('email');
+    await post(request, '/api/demo/respond', { accountId: 'demo-studio', username, text: 'reader@example.com' });
+    current = await state(request);
+    expect(current.runs.find(item => item.id === journey.id)?.nodeId).toBe('follow');
+    expect(sent().some(item => item.text === 'Your resources are ready.')).toBeFalsy();
+    await post(request, '/api/demo/respond', { accountId: 'demo-studio', username, runId: journey.id, buttonIndex: 0 });
+    current = await state(request);
+    const resource = sent().find(item => item.text === 'Your resources are ready.');
+    if (!resource) throw new Error('No resource message was sent after confirmation.');
+    expect(resource.buttons).toHaveLength(3);
+    expect(current.runs.find(item => item.id === journey.id)?.state).toBe('delayed');
+    const interactionBeforeClick = current.contacts.find(item => item.id === person?.id)?.lastInteractionAt;
+    if (visitedLink >= 0) {
+      const button = resource.buttons[visitedLink];
+      if (button?.kind !== 'url') throw new Error('A resource URL button is missing.');
+      const redirect = await request.get(button.url, { maxRedirects: 0 });
+      expect(redirect.status()).toBe(302);
+      expect(redirect.headers().location).toBe(destinations[visitedLink]);
+      expect((await state(request)).contacts.find(item => item.id === person?.id)?.lastInteractionAt).toBe(interactionBeforeClick);
+    }
+    const clock = z.object({ now: z.number() }).parse(await (await post(request, '/api/demo/tick')).json()).now;
+    await post(request, '/api/demo/tick', { now: clock + 61000 });
+    current = await state(request);
+    expect(sent().filter(item => item.text === 'Remember your resources.')).toHaveLength(visitedLink < 0 ? 1 : 0);
+    expect(current.runs.find(item => item.id === journey.id)?.state).toBe('complete');
   }
 });
 

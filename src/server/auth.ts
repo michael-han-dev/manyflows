@@ -3,7 +3,7 @@ import { createMiddleware } from 'hono/factory';
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 import { SignJWT, jwtVerify } from 'jose';
 import { z } from 'zod';
-import { ApiError, baseUrl, demoAllowed, localHost, now, one, run, uid, type AppEnv, type Env } from './core';
+import { ApiError, baseUrl, demoAllowed, localHost, one, run, uid, type AppEnv, type Env } from './core';
 
 const encoder = new TextEncoder();
 const secret = (value: string | undefined) => { if (!value || value.length < 32) throw new ApiError(503, 'Configure a secret of at least 32 characters.'); return encoder.encode(value); };

@@ -1,17 +1,26 @@
 import { z } from 'zod';
 
+export const MESSAGE_TEXT_LIMIT = 2000;
+export const BUTTON_MESSAGE_LIMIT = 640;
+export const BUTTON_LABEL_LIMIT = 20;
+export const MAX_MESSAGE_BUTTONS = 3;
+export const MESSAGING_WINDOW_SECONDS = 24 * 60 * 60;
+export const PRIVATE_REPLY_WINDOW_SECONDS = 7 * 24 * 60 * 60;
+export const MAX_DELAY_SECONDS = 7 * 24 * 60 * 60;
+export const DEFAULT_REMINDER_SECONDS = 60 * 60;
+
 const id = z.string().min(1).max(160);
-const text = z.string().max(2000);
+const text = z.string().max(MESSAGE_TEXT_LIMIT);
 const nullableId = id.nullable();
-const replyButton = z.object({ kind: z.literal('reply'), label: z.string().min(1).max(20), next: id });
-const urlButton = z.object({ kind: z.literal('url'), label: z.string().min(1).max(20), url: z.url().refine(value => /^https?:\/\//.test(value), 'Use an HTTP or HTTPS URL') });
+const replyButton = z.object({ kind: z.literal('reply'), label: z.string().min(1).max(BUTTON_LABEL_LIMIT), next: id });
+const urlButton = z.object({ kind: z.literal('url'), label: z.string().min(1).max(BUTTON_LABEL_LIMIT), url: z.url().refine(value => /^https?:\/\//.test(value), 'Use an HTTP or HTTPS URL') });
 export const buttonSchema = z.discriminatedUnion('kind', [replyButton, urlButton]);
 export const nodeSchema = z.discriminatedUnion('kind', [
-  z.object({ id, kind: z.literal('message'), text, buttons: z.array(buttonSchema).max(3), next: nullableId }),
+  z.object({ id, kind: z.literal('message'), text, buttons: z.array(buttonSchema).max(MAX_MESSAGE_BUTTONS), next: nullableId }),
   z.object({ id, kind: z.literal('collect'), field: z.enum(['email', 'name', 'answer']), prompt: text.min(1), next: id }),
   z.object({ id, kind: z.literal('condition'), field: z.string().min(1).max(80), operator: z.enum(['equals', 'contains', 'has_tag', 'is_set']), value: z.string().max(200), yes: id, no: id }),
   z.object({ id, kind: z.literal('action'), tag: z.string().min(1).max(80), next: id }),
-  z.object({ id, kind: z.literal('delay'), seconds: z.number().int().min(1).max(604800), next: id }),
+  z.object({ id, kind: z.literal('delay'), seconds: z.number().int().min(1).max(MAX_DELAY_SECONDS), next: id }),
   z.object({ id, kind: z.literal('end'), outcome: z.enum(['complete', 'handoff']) }),
 ]);
 export const flowSchema = z.object({ entry: id, nodes: z.array(nodeSchema).min(1).max(100) });
@@ -214,6 +223,7 @@ export function validateFlow(input: CampaignInput): string[] {
   if (input.privateReply && opening?.kind !== 'message') errors.push('The first private reply must be a message.');
   for (const node of input.flow.nodes) {
     if (node.kind === 'message' && !node.text.trim()) errors.push(`Step ${node.id} needs message text.`);
+    if (node.kind === 'message' && node.buttons.length && node.text.length > BUTTON_MESSAGE_LIMIT) errors.push(`Step ${node.id} must use at most ${BUTTON_MESSAGE_LIMIT} characters with buttons.`);
     if (node.kind === 'message' && node.buttons.some(button => button.kind === 'reply') && node.next) errors.push(`Step ${node.id} cannot auto-advance while waiting for a button.`);
     for (const target of nextNodes(node)) if (!nodes.has(target)) errors.push(`Step ${node.id} points to missing step ${target}.`);
   }
