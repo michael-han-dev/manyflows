@@ -27,7 +27,7 @@ function StepCard({ data, selected }: NodeProps<GraphNode>) {
     ? step.buttons.flatMap((button, index) => button.kind === 'reply' ? [{ id: `reply-${index}`, label: button.label }] : []).concat(step.buttons.some(button => button.kind === 'reply') ? [] : [{ id: 'next', label: 'Continue' }])
     : step.kind === 'condition' ? [{ id: 'yes', label: 'Yes' }, { id: 'no', label: 'No' }]
     : step.kind === 'end' ? [] : [{ id: 'next', label: 'Continue' }];
-  return <div className={`flow-step flow-${step.kind} ${selected ? 'selected' : ''}`}><Handle type="target" position={Position.Top} /><div className="flow-step-head"><Icon icon={nodeIcons[step.kind]} size={16} /><strong>{labels[step.kind]}</strong>{data.entry && <span>ENTRY</span>}</div><p>{stepSummary(step)}</p><small>{step.id}</small>{outputs.map((output, index) => <div className="flow-port" key={output.id} style={{ left: `${(index + 1) / (outputs.length + 1) * 100}%` }}><span>{output.label}</span><Handle id={output.id} type="source" position={Position.Bottom} /></div>)}</div>;
+  return <div className={`flow-step flow-${step.kind} ${selected ? 'selected' : ''}`}><Handle type="target" position={Position.Top} /><div className="flow-step-head"><Icon icon={nodeIcons[step.kind]} size={16} /><strong>{labels[step.kind]}</strong>{data.entry && <span>ENTRY</span>}</div><p>{stepSummary(step)}</p><small title={step.id}>{step.id}</small>{outputs.map((output, index) => <div className="flow-port" key={output.id} style={{ left: `${(index + 1) / (outputs.length + 1) * 100}%`, width: `${100 / (outputs.length + 1)}%` }}><span title={output.label}>{output.label}</span><Handle id={output.id} type="source" position={Position.Bottom} /></div>)}</div>;
 }
 
 const nodeTypes = { relay: StepCard };
