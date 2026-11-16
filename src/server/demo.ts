@@ -1,14 +1,14 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { hmac } from './auth';
-import { ApiError, demoAllowed, now, one, requireValue, run, statement, uid, type AccountRow, type AppEnv, type Env, type RunRow } from './core';
+import { ApiError, accountSelect, demoAllowed, now, one, requireValue, run, statement, uid, type AccountRow, type AppEnv, type Env, type RunRow } from './core';
 import { ingestSigned } from './events';
 import { drain } from './engine';
 import { bindNext } from './meta';
 
 export const demo = new Hono<AppEnv>();
 demo.use('/api/demo/*', async (c, next) => { if (!demoAllowed(c.env, c.req.url)) throw new ApiError(404, 'Local simulator is disabled.'); await next(); });
-async function demoAccount(env: Env, id: string) { const account = requireValue(await one<AccountRow>(env, 'SELECT * FROM accounts WHERE id=?', id)); if (account.mode !== 'demo') throw new ApiError(403, 'The simulator only accepts demo accounts.'); return account; }
+async function demoAccount(env: Env, id: string) { const account = requireValue(await one<AccountRow>(env, `${accountSelect} WHERE id=?`, id)); if (account.mode !== 'demo') throw new ApiError(403, 'The simulator only accepts demo accounts.'); return account; }
 async function ingest(env: Env, payload: unknown) { const raw = JSON.stringify(payload); const secret = env.META_APP_SECRET ?? 'local-demo-signature-secret'; const ids = await ingestSigned(env, raw, `sha256=${await hmac(secret, raw)}`, secret); await drain(env); return ids; }
 demo.post('/api/demo/seed', async c => {
   const time = await now(c.env);

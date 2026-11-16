@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { campaignInputSchema, type Button, type CampaignInput, type FlowNode } from '../shared/domain';
 import { digest } from './auth';
-import { baseUrl, buttons, contact, demoAllowed, now, one, rows, run, statement, uid, type AccountRow, type ActionRow, type CampaignRow, type ContactRow, type Env, type RunRow } from './core';
+import { accountSelect, baseUrl, buttons, contact, demoAllowed, now, one, rows, run, statement, uid, type AccountRow, type ActionRow, type CampaignRow, type ContactRow, type Env, type RunRow } from './core';
 import { eventSchema, queueEvent, type Event } from './events';
 import { bindNext, send, syncAccount } from './meta';
 
@@ -13,7 +13,7 @@ function matches(input: CampaignInput, text: string) {
 async function campaignInput(env: Env, versionId: string) { const version = await one<{ input: string }>(env, 'SELECT input FROM versions WHERE id=?', versionId); if (!version) throw new Error('Published version is missing'); return campaignInputSchema.parse(JSON.parse(version.input)); }
 async function processComment(env: Env, event: Extract<Event, { kind: 'comment' }>) {
   const time = await now(env);
-  const account = await one<AccountRow>(env, 'SELECT * FROM accounts WHERE id=?', event.accountId); if (!account) return;
+  const account = await one<AccountRow>(env, `${accountSelect} WHERE id=?`, event.accountId); if (!account) return;
   const pending = await one(env, "SELECT id FROM campaigns WHERE account_id=? AND status='live' AND live_target_kind='next' AND bound_media_id IS NULL", event.accountId);
   if (pending) { if (account.mode === 'live') await syncAccount(env, account); else await bindNext(env, account.id); }
   if (pending && !await one(env, 'SELECT id FROM media WHERE account_id=? AND id=?', event.accountId, event.mediaId)) throw new Error('Waiting for media discovery');
@@ -108,7 +108,7 @@ export async function processJob(env: Env, id: string) {
     const record = await one<{ payload: string; applied_at: number | null }>(env, 'SELECT payload,applied_at FROM events WHERE id=?', claimed.event_id);
     if (record && !record.applied_at) {
       const event = eventSchema.parse(JSON.parse(record.payload));
-      if (demoAllowed(env) && await one(env, "SELECT 1 FROM settings JOIN accounts ON accounts.id=? AND accounts.mode='demo' WHERE settings.key=? AND settings.value='true'", event.accountId, `job-failure:${event.accountId}`)) throw new Error('Simulated processing failure');
+      if (demoAllowed(env) && await one(env, `SELECT 1 FROM settings JOIN (${accountSelect}) accounts ON accounts.id=? AND accounts.mode='demo' WHERE settings.key=? AND settings.value='true'`, event.accountId, `job-failure:${event.accountId}`)) throw new Error('Simulated processing failure');
       if (event.kind === 'comment') await processComment(env, event);
       else if (await processResponse(env, event) === 'deferred') {
         const exhausted = claimed.attempts >= 20;
@@ -160,12 +160,12 @@ async function executeAction(env: Env, item: ActionRow, journey: RunRow, person:
   if (item.available_at > time) { await run(env, 'UPDATE runs SET wake_at=? WHERE id=?', item.available_at, journey.id); return 'wait'; }
   const expires = item.kind === 'private' ? journey.comment_at + 7 * 86400000 : item.kind === 'dm' ? (person.last_interaction_at ?? 0) + 86400000 : Infinity;
   if (expires <= time) { await env.DB.batch([statement(env, "UPDATE runs SET state='expired',updated_at=? WHERE id=?", time, journey.id), statement(env, "UPDATE actions SET status='failed',error='Messaging window expired.',updated_at=? WHERE id=?", time, item.id)]); return 'stop'; }
-  const account = await one<AccountRow>(env, 'SELECT * FROM accounts WHERE id=?', journey.account_id); if (!account) throw new Error('Missing account');
+  const account = await one<AccountRow>(env, `${accountSelect} WHERE id=?`, journey.account_id); if (!account) throw new Error('Missing account');
   const demoPacing = demoAllowed(env) && account.mode === 'demo' ? await one<{ value: string }>(env, 'SELECT value FROM settings WHERE key=?', `pacing:${account.id}`) : null;
   const pacing = demoAllowed(env) && account.mode === 'demo' ? Number(demoPacing?.value ?? 0) : 5000;
   const slot = await statement(env, 'UPDATE accounts SET next_send_at=? WHERE id=? AND next_send_at<=? RETURNING id', time + pacing, account.id, time).first();
   if (!slot) {
-    const pending = await one<{ next_send_at: number }>(env, 'SELECT next_send_at FROM accounts WHERE id=?', account.id);
+    const pending = await one<{ next_send_at: number }>(env, `${accountSelect} WHERE id=?`, account.id);
     await run(env, 'UPDATE runs SET wake_at=? WHERE id=?', pending?.next_send_at ?? time + 5000, journey.id);
     return 'wait';
   }

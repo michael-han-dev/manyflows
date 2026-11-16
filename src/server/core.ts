@@ -6,7 +6,7 @@ export interface Env {
   DB: D1Database; OUTBOX: Queue<QueueJob>; ASSETS: Fetcher;
   ADMIN_PASSWORD?: string; SESSION_SECRET?: string; TOKEN_ENCRYPTION_KEY?: string;
   DEMO_MODE?: string; PUBLIC_BASE_URL?: string; GRAPH_VERSION?: string;
-  META_APP_ID?: string; META_APP_SECRET?: string; META_WEBHOOK_VERIFY_TOKEN?: string; META_INSIGHTS_ENABLED?: string;
+  META_APP_ID?: string; META_APP_SECRET?: string; META_LOGIN_CONFIG_ID?: string; META_WEBHOOK_VERIFY_TOKEN?: string; META_INSIGHTS_ENABLED?: string;
 }
 export type AppEnv = { Bindings: Env; Variables: { sessionId: string } };
 export const uid = () => crypto.randomUUID();
@@ -18,6 +18,10 @@ export const baseUrl = (env: Env) => {
   return url.origin;
 };
 export const graphVersion = (env: Env) => env.GRAPH_VERSION && /^v\d+\.0$/.test(env.GRAPH_VERSION) ? env.GRAPH_VERSION : 'v27.0';
+export function metaConfigured(env: Env) {
+  try { return !!(env.META_APP_ID?.trim() && env.META_APP_SECRET?.trim() && env.META_LOGIN_CONFIG_ID?.trim() && env.META_WEBHOOK_VERIFY_TOKEN?.trim() && env.ADMIN_PASSWORD && env.SESSION_SECRET && env.SESSION_SECRET.length >= 32 && env.TOKEN_ENCRYPTION_KEY && env.TOKEN_ENCRYPTION_KEY.length >= 32 && env.PUBLIC_BASE_URL && baseUrl(env)); }
+  catch { return false; }
+}
 export const statement = (env: Env, sql: string, ...args: (string | number | null)[]) => env.DB.prepare(sql).bind(...args);
 export const one = <T>(env: Env, sql: string, ...args: (string | number | null)[]) => statement(env, sql, ...args).first<T>();
 export async function rows<T>(env: Env, sql: string, ...args: (string | number | null)[]) { return (await statement(env, sql, ...args).all<T>()).results; }
@@ -39,7 +43,15 @@ export interface RunRow { id: string; account_id: string; contact_id: string; ca
 export const flowRun = (r: RunRow): FlowRun => ({ id: r.id, accountId: r.account_id, contactId: r.contact_id, campaignId: r.campaign_id, versionId: r.version_id, commentId: r.comment_id, mediaId: r.media_id, nodeId: r.node_id, state: r.state, wakeAt: r.wake_at, createdAt: r.created_at, updatedAt: r.updated_at });
 export interface ActionRow { id: string; account_id: string; run_id: string; node_id: string; kind: Action['kind']; status: Action['status']; text: string; buttons: string; payload: string | null; attempts: number; error: string | null; available_at: number; started_at: number | null; created_at: number; updated_at: number; }
 export const action = (r: ActionRow): Action => ({ id: r.id, accountId: r.account_id, runId: r.run_id, nodeId: r.node_id, kind: r.kind, status: r.status, text: r.text, attempts: r.attempts, error: r.error, createdAt: r.created_at, updatedAt: r.updated_at });
-export interface AccountRow { id: string; username: string; name: string; mode: Account['mode']; status: Account['status']; avatar_url: string | null; token: string | null; token_expires_at: number | null; last_sync_at: number | null; last_insights_at: number | null; permissions: string; sync_error: string | null; }
+export const accountSelect = `SELECT * FROM (
+  SELECT a.id,a.username,a.name,a.mode,a.avatar_url,a.grant_id,a.last_sync_at,a.last_insights_at,a.next_send_at,a.sync_error,
+    g.generation AS grant_generation,CASE WHEN a.mode='live' THEN g.expires_at ELSE NULL END AS token_expires_at,
+    CASE WHEN a.mode='demo' THEN a.status
+      WHEN g.id IS NULL OR g.invalidated_at IS NOT NULL OR (g.expires_at IS NOT NULL AND g.expires_at<=CAST(unixepoch('subsec')*1000 AS INTEGER)) THEN 'reconnect'
+      ELSE a.status END AS status
+  FROM accounts a LEFT JOIN meta_grants g ON g.id=a.grant_id
+) AS accounts`;
+export interface AccountRow { id: string; username: string; name: string; mode: Account['mode']; status: Account['status']; avatar_url: string | null; grant_id: string | null; grant_generation: string | null; token_expires_at: number | null; last_sync_at: number | null; last_insights_at: number | null; next_send_at: number; sync_error: string | null; }
 export const account = (r: AccountRow): Account => ({ id: r.id, username: r.username, name: r.name, mode: r.mode, status: r.status, avatarUrl: r.avatar_url, tokenExpiresAt: r.token_expires_at, lastSyncAt: r.last_sync_at });
 export interface MediaRow { id: string; account_id: string; caption: string; type: Media['type']; permalink: string | null; thumbnail_url: string | null; published_at: number; reach: number | null; likes: number | null; comments: number | null; shares: number | null; saves: number | null; }
 export const media = (r: MediaRow): Media => ({ id: r.id, accountId: r.account_id, caption: r.caption, type: r.type, permalink: r.permalink, thumbnailUrl: r.thumbnail_url, publishedAt: r.published_at, reach: r.reach, likes: r.likes, comments: r.comments, shares: r.shares, saves: r.saves });

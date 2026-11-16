@@ -41,6 +41,8 @@ export async function deleteStoredData(env: Env, scope: DeletionScope) {
       guarded('DELETE FROM accounts WHERE id=?', [scope.accountId]),
     );
   } else statements.push(guarded('DELETE FROM contacts WHERE id=?', [scope.contactId]));
+  const deletedIndex = statements.length - 1;
+  if (scope.kind === 'account') statements.push(guarded('DELETE FROM meta_grants WHERE NOT EXISTS(SELECT 1 FROM accounts WHERE accounts.grant_id=meta_grants.id)', []));
   const result = await env.DB.batch(statements);
-  if (result.at(-1)?.meta.changes !== 1) throw new ApiError(409, 'Data deletion is busy because processing or a send is in progress. Wait for that work to finish, then retry.');
+  if (result[deletedIndex]?.meta.changes !== 1) throw new ApiError(409, 'Data deletion is busy because processing or a send is in progress. Wait for that work to finish, then retry.');
 }

@@ -10,6 +10,7 @@
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
+    "paths": { "@manyflows/meta-fetch": ["./src/server/meta-fetch.ts"] },
     "types": ["@cloudflare/workers-types", "vite/client", "node"]
   },
   "include": ["src", "tests", "*.ts"]

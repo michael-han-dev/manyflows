@@ -3,10 +3,10 @@ import { ZodError } from 'zod';
 import { auth, requireOwner } from './auth';
 import { api } from './api';
 import { demo } from './demo';
-import { ApiError, demoAllowed, now, one, rows, run, uid, type AccountRow, type AppEnv, type Env, type QueueJob } from './core';
+import { ApiError, accountSelect, demoAllowed, now, one, rows, run, uid, type AccountRow, type AppEnv, type Env, type QueueJob } from './core';
 import { dispatch, ingestSigned } from './events';
 import { drain, processJob, resumeRun } from './engine';
-import { connections, refreshTokens, syncAccount } from './meta';
+import { connections, syncAccount } from './meta';
 
 const app = new Hono<AppEnv>();
 app.onError((error, c) => {
@@ -50,9 +50,9 @@ export default {
   async scheduled(_event: ScheduledController, env: Env, context: ExecutionContext) {
     context.waitUntil((async () => {
       if (env.DEMO_MODE === 'true' && !demoAllowed(env)) return;
-      await drain(env); await dispatch(env); await refreshTokens(env);
+      await drain(env); await dispatch(env);
       const time = await now(env);
-      for (const account of await rows<AccountRow>(env, "SELECT * FROM accounts WHERE mode='live' AND status='connected' AND (last_sync_at IS NULL OR last_sync_at<? OR EXISTS(SELECT 1 FROM campaigns WHERE campaigns.account_id=accounts.id AND campaigns.status='live' AND campaigns.live_target_kind='next' AND campaigns.bound_media_id IS NULL))", time - 15 * 60000)) { try { await syncAccount(env, account); } catch { continue; } }
+      for (const account of await rows<AccountRow>(env, `${accountSelect} WHERE mode='live' AND status='connected' AND (last_sync_at IS NULL OR last_sync_at<? OR EXISTS(SELECT 1 FROM campaigns WHERE campaigns.account_id=accounts.id AND campaigns.status='live' AND campaigns.live_target_kind='next' AND campaigns.bound_media_id IS NULL))`, time - 15 * 60000)) { try { await syncAccount(env, account); } catch { continue; } }
       await run(env, 'DELETE FROM sessions WHERE expires_at<?', Date.now());
       await run(env, 'DELETE FROM oauth_states WHERE expires_at<?', Date.now());
     })());

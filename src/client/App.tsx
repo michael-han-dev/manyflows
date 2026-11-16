@@ -49,6 +49,20 @@ export default function App() {
   useEffect(() => { let current = true; getSession().then(authenticated => { if (current) setAuth(authenticated ? 'authenticated' : 'unauthenticated'); }).catch(error => { if (current) { setSessionError(error instanceof Error ? error.message : 'Could not reach the server.'); setAuth('unauthenticated'); } }); return () => { current = false; }; }, []);
   useEffect(() => { if (auth === 'authenticated') void refresh().catch(() => undefined); }, [auth, refresh]);
   useEffect(() => {
+    if (auth !== 'authenticated' || !data) return;
+    const url = new URL(window.location.href);
+    const result = url.searchParams.get('connection');
+    if (!result) return;
+    setPage('settings');
+    if (result === 'connected') setNotice('Instagram connected. Review the synced accounts before publishing.');
+    else if (result === 'cancelled') setNotice('Instagram connection cancelled. You can connect again when ready.');
+    else if (result === 'partial') setError('Instagram access was saved, but some accounts need attention. Review the connection warnings below.');
+    else if (result === 'failed') setError('Instagram connection could not be completed. Try Connect Instagram again.');
+    url.searchParams.delete('connection');
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+  }, [auth, data]);
+
+  useEffect(() => {
     if (auth !== 'authenticated') return;
     const interval = window.setInterval(() => { if (document.visibilityState === 'visible') void refresh(true).catch(() => undefined); }, 5000);
     return () => window.clearInterval(interval);

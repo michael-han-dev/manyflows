@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { digest, validSignature } from './auth';
-import { ApiError, now, one, rows, run, statement, type AccountRow, type Env } from './core';
+import { ApiError, accountSelect, now, one, rows, run, statement, type AccountRow, type Env } from './core';
 
 const eventBase = { id: z.string(), accountId: z.string(), senderId: z.string(), username: z.string(), timestamp: z.number() };
 export const eventSchema = z.discriminatedUnion('kind', [
@@ -18,7 +18,7 @@ export async function ingestSigned(env: Env, body: string | ArrayBuffer, signatu
   const time = await now(env);
   const events: Event[] = [];
   for (const entry of payload.entry) {
-    const account = await one<AccountRow>(env, 'SELECT * FROM accounts WHERE id=?', entry.id);
+    const account = await one<AccountRow>(env, `${accountSelect} WHERE id=?`, entry.id);
     if (!account) continue;
     for (const change of entry.changes ?? []) {
       if (change.field !== 'comments') continue;

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { campaignInputSchema, validateFlow, type Bootstrap, type Click, type Message, type ProcessingJob } from '../shared/domain';
-import { ApiError, account, action, baseUrl, buttons, campaign, campaignSelect, contact, demoAllowed, flowRun, graphVersion, media, now, one, requireValue, rows, run, statement, uid, type AccountRow, type ActionRow, type AppEnv, type CampaignRow, type PublishedCampaignRow, type ContactRow, type Env, type MediaRow, type RunRow } from './core';
+import { ApiError, accountSelect, account, action, baseUrl, buttons, campaign, campaignSelect, contact, demoAllowed, flowRun, graphVersion, media, metaConfigured, now, one, requireValue, rows, run, statement, uid, type AccountRow, type ActionRow, type AppEnv, type CampaignRow, type PublishedCampaignRow, type ContactRow, type Env, type MediaRow, type RunRow } from './core';
 import { syncAccount } from './meta';
 import { dispatch, eventSchema } from './events';
 import { deleteStoredData } from './deletion';
@@ -18,7 +18,7 @@ export async function bootstrap(env: Env, query: { accountId?: string; from?: st
   const rangeWhere = `${accountWhere} AND created_at>=? AND created_at<=?`;
   const limit = (size: number) => mode === 'dashboard' ? `LIMIT ${size}` : '';
   const [accounts, medias, campaigns, contacts, runs, actions, messages, clicks, responses, emails, jobs] = await Promise.all([
-    rows<AccountRow>(env, 'SELECT * FROM accounts ORDER BY mode,username'),
+    rows<AccountRow>(env, `${accountSelect} ORDER BY mode,username`),
     rows<MediaRow>(env, `SELECT * FROM media WHERE ${accountWhere} ORDER BY published_at DESC ${limit(1000)}`, accountId, accountId),
     rows<PublishedCampaignRow>(env, `${campaignSelect} WHERE (? IS NULL OR campaigns.account_id=?) ORDER BY campaigns.created_at DESC`, accountId, accountId),
     rows<ContactRow>(env, `SELECT * FROM contacts WHERE ${accountWhere} ORDER BY created_at DESC ${limit(5000)}`, accountId, accountId),
@@ -32,7 +32,7 @@ export async function bootstrap(env: Env, query: { accountId?: string; from?: st
   ]);
   const accepted = actions.filter(item => item.status === 'succeeded');
   const warnings = accounts.flatMap(account => account.sync_error ? [`@${account.username}: ${account.sync_error}`] : []);
-  if (!env.META_APP_ID || !env.META_APP_SECRET) warnings.push('Meta is not configured. Local simulations do not prove live Instagram access.');
+  if (!metaConfigured(env)) warnings.push('Meta is not configured. Local simulations do not prove live Instagram access.');
   if (env.META_INSIGHTS_ENABLED !== 'true') warnings.push('Instagram insights are disabled. Unavailable content metrics are shown as unknown.');
   if (mode === 'dashboard' && (medias.length === 1000 || contacts.length === 5000 || runs.length === 5000 || messages.length === 10000 || actions.length === 10000 || clicks.length === 10000 || jobs.length === 1000)) warnings.push('This view reached its record limit. Select a narrower date range or export all records.');
   return {
@@ -41,7 +41,7 @@ export async function bootstrap(env: Env, query: { accountId?: string; from?: st
     clicks: clicks.map((item): Click => ({ id: item.id, accountId: item.account_id, campaignId: item.campaign_id, runId: item.run_id, contactId: item.contact_id, linkId: item.link_id, automated: !!item.automated, createdAt: item.created_at })),
     jobs: jobs.map(item => ({ id: item.id, accountId: item.account_id, kind: item.kind, state: item.state, attempts: item.attempts, error: item.error, availableAt: item.available_at, receivedAt: item.received_at })),
     metrics: { matchedComments: runs.length, openingAccepted: accepted.filter(item => item.kind === 'private').length, linkMessagesAccepted: accepted.filter(item => buttons.parse(JSON.parse(item.buttons)).some(button => button.kind === 'url')).length, buttonResponders: responses.length, uniqueClickers: new Set(clicks.filter(click => !click.automated).map(click => click.contact_id)).size, emailsCollected: emails.length, completedRuns: runs.filter(item => item.state === 'complete').length, failedActions: actions.filter(item => item.status === 'failed' || item.status === 'uncertain').length },
-    configuration: { demoEnabled: demoAllowed(env), metaConfigured: !!(env.META_APP_ID && env.META_APP_SECRET && env.TOKEN_ENCRYPTION_KEY), publicBaseUrl: baseUrl(env), webhookUrl: `${baseUrl(env)}/webhooks/instagram`, callbackUrl: `${baseUrl(env)}/auth/instagram/callback`, graphVersion: graphVersion(env), warnings },
+    configuration: { demoEnabled: demoAllowed(env), metaConfigured: metaConfigured(env), publicBaseUrl: baseUrl(env), webhookUrl: `${baseUrl(env)}/webhooks/instagram`, callbackUrl: `${baseUrl(env)}/auth/instagram/callback`, graphVersion: graphVersion(env), warnings },
   };
 }
 export const api = new Hono<AppEnv>();
@@ -62,7 +62,7 @@ api.get('/api/export', async c => {
 });
 api.post('/api/campaigns', async c => {
   const input = campaignInputSchema.parse(await c.req.json());
-  requireValue(await one(c.env, 'SELECT id FROM accounts WHERE id=?', input.accountId), 'Account not found.');
+  requireValue(await one(c.env, `${accountSelect} WHERE id=?`, input.accountId), 'Account not found.');
   const id = uid(), time = await now(c.env);
   await run(c.env, 'INSERT INTO campaigns(id,account_id,name,draft,created_at,updated_at) VALUES(?,?,?,?,?,?)', id, input.accountId, input.name, JSON.stringify(input), time, time);
   return c.json(campaign(requireValue(await one<PublishedCampaignRow>(c.env, `${campaignSelect} WHERE campaigns.id=?`, id))), 201);
@@ -80,7 +80,7 @@ api.post('/api/campaigns/:id/publish', async c => {
   const errors = validateFlow(input);
   for (const node of input.flow.nodes) if (node.kind === 'message' && node.buttons.length && node.text.length > 640) errors.push(`Step ${node.id} must use at most 640 characters with buttons.`);
   if (input.target.kind === 'specific' && !await one(c.env, 'SELECT id FROM media WHERE account_id=? AND id=?', input.accountId, input.target.mediaId)) errors.push('The selected media does not belong to this account.');
-  const account = requireValue(await one<AccountRow>(c.env, 'SELECT * FROM accounts WHERE id=?', input.accountId));
+  const account = requireValue(await one<AccountRow>(c.env, `${accountSelect} WHERE id=?`, input.accountId));
   if (account.status !== 'connected') errors.push('Reconnect this account before publishing.');
   if (input.target.kind === 'next') {
     const pending = await one(c.env, "SELECT id FROM campaigns WHERE account_id=? AND id!=? AND status='live' AND bound_media_id IS NULL AND live_target_kind='next'", input.accountId, existing.id);
@@ -102,13 +102,13 @@ api.post('/api/campaigns/:id/duplicate', async c => {
   const body = z.object({ accountId: z.string().optional() }).parse(await c.req.json().catch(() => ({})));
   const input = campaignInputSchema.parse(JSON.parse(existing.draft));
   const accountId = body.accountId ?? existing.account_id;
-  requireValue(await one(c.env, 'SELECT id FROM accounts WHERE id=?', accountId));
+  requireValue(await one(c.env, `${accountSelect} WHERE id=?`, accountId));
   const copy = { ...input, accountId, name: `${input.name.slice(0, 113)} (copy)`, ...(accountId !== existing.account_id ? { target: { kind: 'all' as const } } : {}) };
   const id = uid(), time = await now(c.env);
   await run(c.env, 'INSERT INTO campaigns(id,account_id,name,draft,created_at,updated_at) VALUES(?,?,?,?,?,?)', id, accountId, copy.name, JSON.stringify(copy), time, time);
   return c.json(campaign(requireValue(await one<PublishedCampaignRow>(c.env, `${campaignSelect} WHERE campaigns.id=?`, id))), 201);
 });
-api.post('/api/accounts/:id/sync', async c => { const account = requireValue(await one<AccountRow>(c.env, 'SELECT * FROM accounts WHERE id=?', c.req.param('id'))); await syncAccount(c.env, account); return c.json({ ok: true }); });
+api.post('/api/accounts/:id/sync', async c => { const account = requireValue(await one<AccountRow>(c.env, `${accountSelect} WHERE id=?`, c.req.param('id'))); await syncAccount(c.env, account); return c.json({ ok: true }); });
 
 api.post('/api/jobs/:id/retry', async c => {
   const id = c.req.param('id');
@@ -134,7 +134,7 @@ api.delete('/api/contacts/:id', async c => {
 });
 api.delete('/api/accounts/:id', async c => {
   z.object({ confirmation: z.literal('DELETE') }).parse(await c.req.json());
-  const account = requireValue(await one<{ id: string }>(c.env, 'SELECT id FROM accounts WHERE id=?', c.req.param('id')), 'Account not found.');
+  const account = requireValue(await one<{ id: string }>(c.env, `${accountSelect} WHERE id=?`, c.req.param('id')), 'Account not found.');
   await deleteStoredData(c.env, { kind: 'account', accountId: account.id });
   return c.json({ ok: true });
 });
