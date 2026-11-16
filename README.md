@@ -27,7 +27,7 @@ Use the demo setup control to add simulated accounts and content, then create an
 
 The local demo does not require a Meta developer account. Live integration requires a custom Meta app and authorization for each managed Instagram professional account.
 
-Configure the app for the Instagram Login integration used by this implementation. Required scopes are `instagram_business_basic`, `instagram_business_manage_comments`, and `instagram_business_manage_messages`. Insights access needs verification for the selected setup before enabling it. Do not mix permissions from different API setups.
+Configure the Instagram API with Unified Login. Create or select an Instagram-compatible Facebook Login for Business configuration with system-user access tokens, require an Instagram account, and request only `instagram_basic`, `instagram_manage_comments`, and `instagram_manage_messages`. Add `instagram_manage_insights` only if insights are needed and `META_INSIGHTS_ENABLED` is enabled. The login configuration controls permissions and token expiration. Ads, content publishing, and business-management permissions are not needed for the comment-to-resource pilot.
 
 Register the application's HTTPS callback and webhook URLs in Meta's dashboard. Settings shows the URLs derived from `PUBLIC_BASE_URL`:
 
@@ -36,9 +36,11 @@ Register the application's HTTPS callback and webhook URLs in Meta's dashboard. 
 
 Meta needs a public HTTPS endpoint for live webhooks. Use the finished pilot deployment or an explicitly configured development tunnel for that step.
 
-Set `META_APP_ID`, `META_APP_SECRET`, and `META_WEBHOOK_VERIFY_TOKEN` for the custom app. Keep tokens and secrets out of source control. Use the account connection control to authorize access. The server encrypts stored account tokens with `TOKEN_ENCRYPTION_KEY`.
+Set `META_APP_ID`, `META_APP_SECRET`, `META_LOGIN_CONFIG_ID`, and `META_WEBHOOK_VERIFY_TOKEN` for the custom Meta app. Keep credentials and deployment details out of source control. Subscribe the app webhook to `comments`, `messages`, and `messaging_postbacks`. Use Connect Instagram to open Meta Unified Login, select the business portfolio, and share the professional Instagram accounts you manage. The server discovers every shared account before saving the connection and subscribes each account to webhooks.
 
-Verify comments and messaging with an actual person outside the app's developer roles and complete any required review. Test the initial private reply, response-button events, subsequent messages, media access, and insights. Own-account use does not establish all required permissions.
+All selected accounts in a business share one grant encrypted with `TOKEN_ENCRYPTION_KEY`. Their contacts and campaigns remain separate. Reconnecting replaces that grant and detaches accounts omitted from the new selection without deleting their data. A failed webhook subscription restricts that account; a media sync failure leaves its connection status unchanged and shows a warning. Token expiry or revocation requires reconnecting through Unified Login. This implementation does not refresh tokens automatically or use the legacy Instagram Login endpoints. Migration `0005_unified_login.sql` preserves demo data and asks any old live accounts to reconnect.
+
+Development mode supports testing with accounts that have a role on the Meta app. Before connecting other clients, complete the required App Review and request Advanced Access for the configuration permissions. Verify comments and messaging with an actual person and the access level needed for your pilot. Test the initial private reply, response-button events, subsequent messages, media access, and insights. Own-account use does not establish all required permissions.
 
 Keep ManyChat connected during investigation. Before enabling overlapping production automations, pause the corresponding ManyChat campaign and verify Meta's conversation-routing configuration. Cut over one account at a time.
 
@@ -71,6 +73,7 @@ npx wrangler secret put SESSION_SECRET --config wrangler.production.jsonc
 npx wrangler secret put TOKEN_ENCRYPTION_KEY --config wrangler.production.jsonc
 npx wrangler secret put META_APP_ID --config wrangler.production.jsonc
 npx wrangler secret put META_APP_SECRET --config wrangler.production.jsonc
+npx wrangler secret put META_LOGIN_CONFIG_ID --config wrangler.production.jsonc
 npx wrangler secret put META_WEBHOOK_VERIFY_TOKEN --config wrangler.production.jsonc
 npx wrangler d1 migrations apply DB --remote --config wrangler.production.jsonc
 npm run build
@@ -98,7 +101,7 @@ After deployment, run `npm run test:hosted -- wrangler.production.jsonc` to chec
 
 ## Operational behavior
 
-Drafts and immutable publications are separate. Existing runs use their original flow version. Each account has its own contacts, campaigns, media bindings, credentials, and sending allowance.
+Drafts and immutable publications are separate. Existing runs use their original flow version. Each account has its own contacts, campaigns, media bindings, and sending allowance. Accounts selected from the same business share an encrypted Meta grant. Deleting one account preserves the grant while another account still uses it; deleting its last account removes the stored grant.
 
 The webhook receiver checks signatures over the original request body and stores events with recoverable work records. Storage deduplicates events and action claims. Unknown external send outcomes remain visible as uncertain instead of being automatically repeated.
 
