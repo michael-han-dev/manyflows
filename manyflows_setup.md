@@ -120,6 +120,10 @@ Prefer end-to-end tests for account isolation, publishing, conversations, redire
 
 Ignore credentials, private production config, `.wrangler`, build output, dependencies, test reports, `implement.md`, and `the_plan.md`. Commit sanitized examples only. `.gitignore` does not erase history: rotate exposed credentials and scrub affected history when necessary. Back up D1 and preserve encryption keys. Reconnect accounts if Meta access expires or is revoked.
 
+### Observability
+
+The Wrangler observability configuration enables persisted invocation logs with full sampling for the pilot and disables traces. Query strings are redacted, but URL paths are still retained. View logs in **Workers & Pages → comment-on-video → Observability**. Cloudflare stores these logs separately from D1, so they do not consume D1 storage. Log volume and retention are subject to Cloudflare allowances and charges; check current [Workers Logs pricing](https://developers.cloudflare.com/workers/observability/logs/workers-logs/#pricing) and [Observability pricing](https://developers.cloudflare.com/observability/pricing/) before increasing traffic or retention. Keep the ignored production config's observability settings aligned when deploying.
+
 ## Current handoff
 
 As of 16 November 2026, the app is deployed with owner-only access and the Meta login configuration and webhooks configured. Live Instagram authorization and delivery remain unverified. Instagram login returned **App not active**; the app is unpublished and its Instagram Tester list is empty. Missing tester registration is the leading explanation, pending a successful retry. Invite and accept the intended tester account, reconnect, then run the pilot.

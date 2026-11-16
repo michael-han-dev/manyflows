@@ -5,6 +5,11 @@
   "preview_urls": false,
   "main": "src/server/index.ts",
   "compatibility_date": "2026-11-13",
+  "observability": {
+    "redact_query_string": true,
+    "logs": { "enabled": true, "invocation_logs": true, "persist": true, "head_sampling_rate": 1 },
+    "traces": { "enabled": false }
+  },
   "assets": { "directory": "./dist", "binding": "ASSETS", "not_found_handling": "single-page-application", "run_worker_first": ["/api/*", "/webhooks/*", "/auth/*", "/r/*"] },
   "d1_databases": [{ "binding": "DB", "database_name": "comment-on-video", "database_id": "00000000-0000-0000-0000-000000000000", "migrations_dir": "migrations" }],
   "queues": {
