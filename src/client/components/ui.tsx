@@ -1,7 +1,7 @@
 import { useId, useRef, type ComponentProps, type ReactNode } from 'react';
 import * as Modal from '@radix-ui/react-dialog';
 import * as Switch from '@radix-ui/react-switch';
-import { ArrowTopRightIcon, ArchiveIcon, ChatBubbleIcon, CheckIcon, Cross2Icon, ReloadIcon } from '@radix-ui/react-icons';
+import { ArrowTopRightIcon, ArchiveIcon, ChatBubbleIcon, CheckIcon, ChevronDownIcon, Cross2Icon, ReloadIcon } from '@radix-ui/react-icons';
 
 export type AppIcon = typeof ChatBubbleIcon;
 
@@ -18,6 +18,10 @@ export function Button({ variant = 'secondary', size = 'medium', type = 'button'
 
 export function IconButton({ type = 'button', className = '', ...props }: ComponentProps<'button'> & { 'aria-label': string }) {
   return <button type={type} className={`icon-button ${className}`} {...props} />;
+}
+
+export function Select(props: ComponentProps<'select'>) {
+  return <span className="select-control"><select {...props} /><Icon icon={ChevronDownIcon} /></span>;
 }
 
 export function Status({ value }: { value: string }) {

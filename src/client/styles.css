@@ -39,13 +39,18 @@ input {
   font: inherit;
   -webkit-tap-highlight-color: transparent;
   border: 1px solid var(--border);
-  background: var(--card);
+  background: var(--surface-1);
   border-radius: var(--radius-sm);
   color: var(--foreground);
   padding: var(--space-2) var(--space-3);
-  min-height: 39px;
   max-width: 100%;
   transition: border-color var(--motion-fast),box-shadow var(--motion-fast);
+}
+
+input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=hidden]) {
+  height: var(--control-height);
+  min-height: var(--control-height);
+  padding-block: 0;
 }
 
 textarea {
@@ -64,18 +69,50 @@ textarea {
 }
 
 select {
+  appearance: none;
   font: inherit;
+  font-size: var(--text-md);
   font-weight: 500;
+  line-height: 1.5;
   -webkit-tap-highlight-color: transparent;
   border: 1px solid var(--border);
-  background: var(--card);
+  background: var(--surface-1);
   border-radius: var(--radius-sm);
   color: var(--foreground);
-  padding: var(--space-2) var(--space-3);
-  min-height: 39px;
+  height: var(--control-height);
+  min-height: var(--control-height);
+  width: 100%;
+  min-width: 0;
   max-width: 100%;
-  transition: border-color var(--motion-fast),box-shadow var(--motion-fast);
-  padding-right: var(--space-5);
+  padding: 0 var(--space-6) 0 var(--space-3);
+  cursor: pointer;
+  transition: border-color var(--motion-fast), box-shadow var(--motion-fast), background-color var(--motion-fast);
+}
+
+.select-control {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  vertical-align: middle;
+}
+
+.select-control>svg {
+  position: absolute;
+  top: 50%;
+  right: var(--space-3);
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--muted-foreground);
+}
+
+select:disabled {
+  cursor: not-allowed;
+  opacity: .48;
+}
+
+select:disabled+svg {
+  opacity: .48;
 }
 
 a {
@@ -694,8 +731,11 @@ code {
   font-size: var(--text-md);
 }
 
-.field select {
+.field .select-control {
   width: 100%;
+}
+
+.field select {
   font-size: var(--text-md);
 }
 
@@ -958,30 +998,16 @@ code {
   justify-content: center;
   color: var(--primary-foreground);
   font-size: var(--text-md);
-}
-
-.workspace-label>div {
-  flex: 1;
-  min-width: 0;
+  flex-shrink: 0;
 }
 
 .workspace-label strong {
   font-size: var(--text-sm);
   font-weight: 600;
   color: var(--foreground);
-}
-
-.workspace-label small {
-  font-size: var(--text-xs);
-  color: var(--muted-foreground);
-  display: block;
-  letter-spacing: .1px;
-  margin-top: 3px;
-  overflow-wrap: anywhere;
-}
-
-.workspace-label>svg {
-  color: var(--muted-foreground);
+  white-space: nowrap;
+  line-height: 1.3;
+  flex: 1;
 }
 
 .sidebar nav {
@@ -1197,15 +1223,12 @@ code {
   min-width: 0;
 }
 
-.global-filters select {
-  font-size: var(--text-md);
-  border: 1px solid var(--border);
-  min-height: var(--control-height);
-  padding: var(--space-2) var(--space-5) var(--space-2) var(--space-2);
-  background-color: var(--card);
-  border-radius: var(--radius-sm);
-  color: var(--muted-foreground);
+.global-filters .select-control {
   max-width: 180px;
+}
+
+.global-filters select {
+  color: var(--muted-foreground);
 }
 
 .account-select {
@@ -1215,6 +1238,7 @@ code {
 
 .account-select-icon {
   position: absolute;
+  z-index: 1;
   top: 50%;
   left: 9px;
   pointer-events: none;
@@ -1222,14 +1246,20 @@ code {
   transform: translateY(-50%);
 }
 
-.account-select select {
-  padding-left: var(--space-6);
+.account-select .select-control {
   max-width: 175px;
 }
 
+.account-select select {
+  padding-left: var(--space-6);
+}
+
 .global-filters .refresh-button {
-  min-width: 27px;
-  padding: var(--space-1);
+  width: var(--control-height);
+  min-width: var(--control-height);
+  height: var(--control-height);
+  min-height: var(--control-height);
+  padding: 0;
   color: var(--muted-foreground);
 }
 
@@ -1319,7 +1349,6 @@ code {
 }
 
 .custom-dates input {
-  min-height: 29px;
   padding: var(--space-1) var(--space-2);
   font-size: var(--text-md);
 }
@@ -2616,7 +2645,7 @@ code {
 
 .editor-heading {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-4);
   margin-bottom: var(--space-5);
   flex-wrap: wrap;
@@ -2624,6 +2653,10 @@ code {
 
 .editor-heading>.back-button {
   padding-left: 0;
+  min-height: var(--control-height);
+  min-width: var(--control-height);
+  padding: 6px;
+  align-self: flex-start;
 }
 
 .editor-title {
@@ -2637,30 +2670,11 @@ code {
   overflow-wrap: anywhere;
 }
 
-.editor-title .status {
-  font-size: var(--text-sm);
-}
-
 .editor-title>p {
   font-size: var(--text-sm);
   color: var(--muted-foreground);
-  display: flex;
-  gap: var(--space-1);
-  align-items: center;
+  display: block;
   margin-top: var(--space-2);
-  flex-wrap: wrap;
-}
-
-.save-indicator {
-  width: 5px;
-  height: 5px;
-  display: inline-block;
-  background: var(--accent);
-  border-radius: 50%;
-}
-
-.save-indicator.unsaved {
-  background: var(--accent);
 }
 
 .version-note {
@@ -3056,17 +3070,10 @@ code {
   white-space: nowrap;
 }
 
-.flow-toolbar span {
+.flow-toolbar span:not(.select-control) {
   font-size: var(--text-sm);
   color: var(--muted-foreground);
   margin-left: var(--space-1);
-}
-
-.flow-toolbar select {
-  font-size: var(--text-md);
-  min-height: 40px;
-  padding: var(--space-1) var(--space-5) var(--space-1) var(--space-2);
-  max-width: 100%;
 }
 
 .flow-workspace {
@@ -3119,13 +3126,6 @@ code {
 
 .step-inspector input {
   font-size: var(--text-md);
-  min-height: 33px;
-  padding: var(--space-2);
-}
-
-.step-inspector select {
-  font-size: var(--text-md);
-  min-height: 33px;
   padding: var(--space-2);
 }
 
@@ -3163,9 +3163,8 @@ code {
   margin-bottom: var(--space-4);
 }
 
-.button-editor select {
+.button-editor .select-control {
   max-width: 145px;
-  padding-left: var(--space-1);
 }
 
 .button-editor>.inline {
@@ -3401,12 +3400,6 @@ code {
 
 .studio-section .field input {
   font-size: var(--text-md);
-  min-height: 36px;
-}
-
-.studio-section .field select {
-  font-size: var(--text-md);
-  min-height: 36px;
 }
 
 .studio-section .field textarea {
@@ -3700,7 +3693,6 @@ code {
 .login-form>input {
   width: 100%;
   font-size: var(--text-md);
-  min-height: 43px;
   padding: var(--space-3) var(--space-3);
   border-color: var(--border);
   background: var(--card);
@@ -4147,6 +4139,7 @@ code {
   padding: var(--space-4);
   overflow-wrap: anywhere;
   font-size: var(--text-sm);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .preview-comments {
@@ -4285,7 +4278,7 @@ input:focus,select:focus,textarea:focus {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 18%, transparent);
 }
 
-input,select,textarea {
+input,textarea {
   background: var(--surface-1);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -4354,6 +4347,58 @@ button,a,input,select,textarea,summary {
   to { opacity: 1; transform: translate(-50%, -50%); }
 }
 
+.editor-title-row{
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.editor-state{
+  font-size: var(--text-xs);
+  line-height: 1;
+  font-weight: 500;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+
+.preview-post[data-context=comments] img{
+  max-height: 160px;
+}
+
+.preview-post[data-context=comments] .preview-post-placeholder{
+  min-height: 110px;
+}
+
+.preview-post[data-context=comments] p{
+  margin-top: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.preview-comments h3{
+  font-size: var(--text-md);
+  margin-bottom: var(--space-4);
+}
+
+.preview-comments p:last-child{
+  margin-bottom: 0;
+}
+
+.preview-post-context{
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+  margin-bottom: var(--space-2);
+}
+
 @media (min-width:1550px) {
 
   .topbar {
@@ -4418,10 +4463,9 @@ button,a,input,select,textarea,summary {
 
   .workspace-label strong {
     font-size: var(--text-sm);
-  }
-
-  .workspace-label small {
-    font-size: var(--text-sm);
+    white-space: nowrap;
+    line-height: 1.3;
+    flex: 1;
   }
 
   .sidebar nav button {
@@ -4869,10 +4913,11 @@ button,a,input,select,textarea,summary {
   .editor-heading {
     flex-wrap: wrap;
     gap: var(--space-2);
+    align-items: flex-start;
   }
 
   .editor-title {
-    flex-basis: calc(100% - 50px);
+    flex-basis: calc(100% - var(--control-height) - var(--space-2));
   }
 
   .editor-actions {
@@ -4901,8 +4946,11 @@ button,a,input,select,textarea,summary {
     font-size: var(--text-md);
   }
 
-  .flow-toolbar select {
+  .flow-toolbar .select-control {
     max-width: 120px;
+  }
+
+  .flow-toolbar select {
     font-size: var(--text-sm);
   }
 
@@ -4966,12 +5014,15 @@ button,a,input,select,textarea,summary {
     margin-left: auto;
   }
 
-  .global-filters select {
-    font-size: var(--text-sm);
+  .global-filters .select-control {
     max-width: 140px;
   }
 
-  .account-select select {
+  .global-filters select {
+    font-size: var(--text-sm);
+  }
+
+  .account-select .select-control {
     max-width: 145px;
   }
 
@@ -5078,15 +5129,11 @@ button,a,input,select,textarea,summary {
     font-size: var(--text-sm);
   }
 
-  .global-filters .refresh-button {
-    display: none;
-  }
-
-  .global-filters select {
+  .global-filters .select-control {
     max-width: 140px;
   }
 
-  .global-filters .date-select {
+  .global-filters .select-control:has(.date-select) {
     max-width: 115px;
   }
 
@@ -5192,7 +5239,7 @@ button,a,input,select,textarea,summary {
     margin-bottom: var(--space-1);
   }
 
-  .flow-toolbar select {
+  .flow-toolbar .select-control {
     max-width: 190px;
   }
 
@@ -5200,7 +5247,7 @@ button,a,input,select,textarea,summary {
     width: 100%;
   }
 
-  .flow-toolbar>.inline>select {
+  .flow-toolbar>.inline>.select-control {
     flex: 1;
   }
 
@@ -5428,10 +5475,9 @@ button,a,input,select,textarea,summary {
 
   .workspace-label strong {
     font-size: var(--text-md);
-  }
-
-  .workspace-label small {
-    font-size: var(--text-sm);
+    white-space: nowrap;
+    line-height: 1.3;
+    flex: 1;
   }
 
   .sidebar-bottom {
@@ -5504,12 +5550,8 @@ button,a,input,select,textarea,summary {
   }
 
   .global-filters .refresh-button {
-    display: inline-flex;
-    padding: var(--space-1);
-    min-width: 32px;
     grid-column: auto;
     justify-self: end;
-    min-height: 32px;
   }
 
   .topbar .breadcrumb>strong {
@@ -5531,38 +5573,32 @@ button,a,input,select,textarea,summary {
     gap: var(--space-2);
     flex: 1;
     display: grid;
-    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 32px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) var(--control-height);
     width: 0;
+  }
+
+  .global-filters .select-control {
+    max-width: 100%;
+    width: 100%;
   }
 
   .global-filters select {
     font-size: var(--text-sm);
-    max-width: 100%;
-    padding-top: var(--space-1);
-    padding-bottom: var(--space-1);
-    min-height: var(--control-height);
-    width: 100%;
   }
 
-  .global-filters .date-select {
+  .global-filters .select-control:has(.date-select) {
     max-width: 100%;
-    padding-left: var(--space-2);
-    padding-right: var(--space-5);
-    width: 100%;
-    font-size: var(--text-sm);
   }
 
   .account-select-icon {
     top: 50%;
     left: 8px;
     transform: translateY(-50%);
+    display: none;
   }
 
-  .account-select select {
+  .account-select .select-control {
     max-width: 100%;
-    padding-left: var(--space-6);
-    width: 100%;
-    font-size: var(--text-sm);
   }
 
   .main-content {
@@ -5829,7 +5865,6 @@ button,a,input,select,textarea,summary {
 
   .search-field input {
     font-size: var(--text-md);
-    min-height: 35px;
   }
 
   .page-footnote {
@@ -6131,13 +6166,14 @@ button,a,input,select,textarea,summary {
   .editor-heading {
     gap: var(--space-2);
     margin-bottom: var(--space-5);
+    align-items: flex-start;
   }
 
   .editor-heading>.back-button {
-    padding: var(--space-1) var(--space-2) var(--space-1) 0;
-    min-width: 24px;
+    padding: 6px;
+    min-width: var(--control-height);
     align-self: flex-start;
-    min-height: 28px;
+    min-height: var(--control-height);
   }
 
   .editor-title h1 {
@@ -6150,16 +6186,13 @@ button,a,input,select,textarea,summary {
   }
 
   .editor-title {
-    flex-basis: calc(100% - 35px);
+    flex-basis: calc(100% - var(--control-height) - var(--space-2));
   }
 
   .editor-title>p {
     font-size: var(--text-sm);
     margin-top: var(--space-2);
-  }
-
-  .editor-title .status {
-    font-size: var(--text-sm);
+    display: block;
   }
 
   .editor-actions {
@@ -6217,12 +6250,10 @@ button,a,input,select,textarea,summary {
 
   .field input {
     font-size: var(--text-md);
-    min-height: 38px;
   }
 
   .field select {
     font-size: var(--text-md);
-    min-height: 38px;
   }
 
   .field textarea {
@@ -6358,7 +6389,6 @@ button,a,input,select,textarea,summary {
 
   .step-inspector input {
     font-size: var(--text-md);
-    min-height: 35px;
   }
 
   .step-inspector textarea {
@@ -6368,7 +6398,6 @@ button,a,input,select,textarea,summary {
 
   .step-inspector select {
     font-size: var(--text-md);
-    min-height: 35px;
   }
 
   .step-inspector .button-editor {
@@ -6651,7 +6680,6 @@ button,a,input,select,textarea,summary {
   }
 
   .login-form>input {
-    min-height: 46px;
     font-size: var(--text-md);
   }
 
@@ -6741,6 +6769,10 @@ button,a,input,select,textarea,summary {
     grid-column: 2 / -1;
     justify-self: start;
   }
+
+  .account-select select{
+    padding-left: var(--space-3);
+  }
 }
 
 @media (max-width:380px) {
@@ -6749,6 +6781,7 @@ button,a,input,select,textarea,summary {
     height: auto;
     min-height: 64px;
     gap: var(--space-3);
+    align-items: flex-start;
   }
 
   .topbar-left {
@@ -6760,22 +6793,29 @@ button,a,input,select,textarea,summary {
   }
 
   .global-filters {
-    gap: var(--space-1);
+    gap: var(--space-2);
+    grid-template-columns: minmax(0, 1fr) var(--control-height);
+  }
+
+  .global-filters .select-control {
+    max-width: 124px;
   }
 
   .global-filters select {
     font-size: var(--text-sm);
+  }
+
+  .account-select .select-control {
     max-width: 124px;
   }
 
   .account-select select {
-    padding-left: var(--space-5);
-    max-width: 124px;
+    padding-left: var(--space-3);
   }
 
-  .global-filters .date-select {
-    max-width: 98px;
-    padding-left: var(--space-1);
+  .global-filters .select-control:has(.date-select) {
+    max-width: 100%;
+    width: 100%;
   }
 
   .account-select-icon {
@@ -6867,10 +6907,37 @@ button,a,input,select,textarea,summary {
   .custom-dates input {
     max-width: 120px;
   }
+
+  .topbar-left>.icon-button{
+    height: var(--control-height);
+    width: var(--control-height);
+    min-height: var(--control-height);
+    min-width: var(--control-height);
+  }
+
+  .global-filters .account-select{
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .global-filters .account-select .select-control{
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .global-filters>.select-control{
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .global-filters .refresh-button{
+    grid-column: 2;
+    grid-row: 2;
+  }
 }
 
 @media (min-width:768px) {
-  .global-filters .account-select select {
+  .global-filters .account-select .select-control {
     min-width: 160px;
     max-width: 220px;
   }
@@ -6919,12 +6986,17 @@ button,a,input,select,textarea,summary {
 }
 
 @media (pointer:coarse) {
+  :root {
+    --control-height: var(--space-7);
+    --control-height-sm: var(--space-7);
+  }
+
   .button,.icon-button {
-    min-height: 40px;
+    min-height: var(--control-height);
   }
 
   .icon-button {
-    min-width: 40px;
+    min-width: var(--control-height);
   }
 }
 

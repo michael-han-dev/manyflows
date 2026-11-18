@@ -519,7 +519,93 @@ test('all workspace layouts remain usable across phone, tablet and desktop width
       const range = await page.getByLabel('Date range', { exact: true }).boundingBox();
       const refresh = await page.getByRole('button', { name: 'Refresh workspace', exact: true }).boundingBox();
       expect(account).not.toBeNull(); expect(range).not.toBeNull(); expect(refresh).not.toBeNull();
-      if (account && range && refresh) { expect(Math.abs(account.y - range.y)).toBeLessThanOrEqual(1); expect(Math.abs(account.y + account.height / 2 - refresh.y - refresh.height / 2)).toBeLessThanOrEqual(1); }
+      if (account && range && refresh) { if (width > 380) expect(Math.abs(account.y - range.y)).toBeLessThanOrEqual(1); else expect(range.y).toBeGreaterThan(account.y); expect(Math.abs(range.y + range.height / 2 - refresh.y - refresh.height / 2)).toBeLessThanOrEqual(1); }
     }
   }
+});
+
+test('preview includes post context and workspace controls have consistent spacing', async ({ page }, testInfo) => {
+  await signIn(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.getByRole('button', { name: 'Create campaign', exact: true }).first().click();
+  await page.getByLabel('Campaign account', { exact: true }).selectOption('demo-studio');
+  await page.getByRole('button', { name: /Specific post or reel/ }).click();
+  const selectedPost = page.getByRole('group', { name: 'Choose content', exact: true }).getByRole('button').first();
+  await selectedPost.click();
+  const caption = await selectedPost.locator('strong').innerText();
+  const preview = page.getByRole('complementary', { name: 'Campaign preview', exact: true });
+  await preview.getByRole('radio', { name: 'Comments', exact: true }).click();
+  await expect.soft(preview.getByText(caption, { exact: true }), 'Comments must retain the selected post caption above the replies').toBeVisible();
+  const postBounds = await preview.getByRole('region', { name: 'Post preview', exact: true }).boundingBox();
+  const commentBounds = await preview.getByRole('region', { name: 'Comments preview', exact: true }).boundingBox();
+  expect(postBounds).not.toBeNull(); expect(commentBounds).not.toBeNull();
+  if (postBounds && commentBounds) expect(postBounds.y + postBounds.height).toBeLessThanOrEqual(commentBounds.y + 1);
+  for (const width of [1440, 1280, 1024, 768, 390, 320]) {
+    await page.setViewportSize({ width, height: 900 });
+    const measurements = await page.evaluate(() => {
+      const workspace = document.querySelector('.workspace-label');
+      const header = document.querySelector('.editor-title');
+      const workspaceText = workspace?.querySelector('strong');
+      const controls = ['[aria-label="Account filter"]', '[aria-label="Date range"]', '[aria-label="Refresh workspace"]', '[aria-label="Campaign account"]'].map(selector => {
+        const element = document.querySelector(selector);
+        if (!element) throw new Error('Missing workspace control');
+        const style = getComputedStyle(element);
+        const arrow = element.closest('.select-control')?.querySelector('svg');
+        return { label: element.getAttribute('aria-label'), height: element.getBoundingClientRect().height, appearance: style.appearance, paddingRight: parseFloat(style.paddingRight), arrowInset: arrow ? element.getBoundingClientRect().right - arrow.getBoundingClientRect().right : null };
+      });
+      return { workspaceText: workspace?.textContent, workspaceIcons: workspace?.querySelectorAll('svg').length, headerMarkers: header?.querySelectorAll('.status i,.save-indicator').length, workspaceLineHeight: workspaceText?.getBoundingClientRect().height, workspaceTextLineHeight: workspaceText ? parseFloat(getComputedStyle(workspaceText).lineHeight) : null, controls };
+    });
+    expect.soft(measurements.workspaceText).not.toContain('Instagram automations');
+    expect.soft(measurements.workspaceIcons).toBe(0);
+    if (measurements.workspaceLineHeight && measurements.workspaceTextLineHeight) expect.soft(measurements.workspaceLineHeight).toBeLessThanOrEqual(measurements.workspaceTextLineHeight + 1);
+    expect.soft(measurements.headerMarkers).toBe(0);
+    expect.soft(new Set(measurements.controls.map(control => control.height)).size, 'Account, date, refresh and form controls must share one height').toBe(1);
+    for (const select of measurements.controls.filter(control => control.label !== 'Refresh workspace')) {
+      expect.soft(select.appearance, 'Dropdown arrows need app-owned edge spacing').toBe('none');
+      expect.soft(select.paddingRight).toBeGreaterThanOrEqual(32);
+      expect.soft(select.arrowInset).toBeGreaterThanOrEqual(8);
+    }
+    if ([1440, 390].includes(width)) {
+      await preview.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: testInfo.outputPath(`preview-controls-${width}.png`), animations: 'disabled' });
+    }
+  }
+  await page.getByRole('button', { name: /All posts and reels/ }).click();
+  await expect(preview.getByText('Example post from this account', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: /Next publication/ }).click();
+  await expect(preview.getByText('Your next post or reel', { exact: true })).toBeVisible();
+  await expect(preview.getByText('Example post from this account', { exact: true })).toHaveCount(0);
+});
+
+test('touch screens keep dropdowns, inputs and action buttons aligned', async ({ page, browser }, testInfo) => {
+  await signIn(page);
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, storageState: await page.context().storageState() });
+  try {
+    const touch = await context.newPage();
+    await touch.goto('/');
+    await touch.getByRole('button', { name: 'Create campaign', exact: true }).first().click();
+    expect(await touch.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBeTruthy();
+    const sizes = await touch.evaluate(() => ['[aria-label="Account filter"]', '[aria-label="Date range"]', '[aria-label="Refresh workspace"]', '[aria-label="Campaign account"]', '[aria-label="Campaign name"]', '.editor-actions .button'].map(selector => {
+      const element = document.querySelector(selector);
+      if (!element) throw new Error('Missing touch control');
+      return element.getBoundingClientRect().height;
+    }));
+    expect(new Set(sizes).size).toBe(1);
+    expect(sizes[0]).toBeGreaterThanOrEqual(40);
+    const bounds = await touch.evaluate(() => ({ scroll: document.documentElement.scrollWidth, width: document.documentElement.clientWidth }));
+    expect(bounds.scroll).toBeLessThanOrEqual(bounds.width + 1);
+    for (const width of [390, 320]) {
+      await touch.setViewportSize({ width, height: 844 });
+      const labels = await touch.locator('.global-filters select').evaluateAll(elements => elements.map(element => {
+        const style = getComputedStyle(element);
+        const canvas = document.createElement('canvas').getContext('2d');
+        if (!canvas) throw new Error('Text measurement unavailable');
+        canvas.font = style.font;
+        const value = element.querySelector('option:checked')?.textContent || '';
+        return { value, required: canvas.measureText(value).width, available: element.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) };
+      }));
+      for (const label of labels) expect(label.required, `${label.value} must remain readable at ${width}px`).toBeLessThanOrEqual(label.available + 1);
+      await touch.screenshot({ path: testInfo.outputPath(`touch-editor-${width}.png`), animations: 'disabled' });
+    }
+  } finally { await context.close(); }
 });

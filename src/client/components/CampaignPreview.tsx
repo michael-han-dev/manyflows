@@ -18,12 +18,13 @@ export function CampaignPreview({ draft, account, media }: { draft: CampaignInpu
     setEvents(current => [...current.slice(0, index), event]);
     setAnswer(''); setAnswerError('');
   }
+  const postContext = <section className="preview-post" aria-label="Post preview" data-context={view === 'Comments' ? 'comments' : 'post'}>{draft.target.kind === 'all' && media && <span className="preview-post-context">Example post from this account</span>}{media?.thumbnailUrl ? <img src={media.thumbnailUrl} alt={draft.target.kind === 'all' ? 'Example post' : 'Selected post'} /> : <div className="preview-post-placeholder">{draft.target.kind === 'next' ? 'Your next post or reel' : draft.target.kind === 'all' ? 'Any post or reel' : 'Selected post or reel'}</div>}<p>{media?.caption || 'Your post caption appears here.'}</p></section>;
   return <aside className="campaign-preview card" aria-label="Campaign preview">
     <div className="campaign-preview-heading"><div><h2>Live preview</h2><p>Explore the draft. Nothing is sent.</p></div><button className="text-button" onClick={() => { setEvents([]); setAnswer(''); }}>Start over</button></div>
     <ToggleGroup.Root type="single" className="preview-switch" aria-label="Preview view" value={view} onValueChange={next => { if (next === 'Post' || next === 'Comments' || next === 'DM') setView(next); }}>{(['Post', 'Comments', 'DM'] satisfies PreviewView[]).map(option => <ToggleGroup.Item key={option} value={option}>{option}</ToggleGroup.Item>)}</ToggleGroup.Root>
     <div className="phone-preview"><div className="phone-top"><span className="avatar">{(account?.username ?? 'A').slice(0, 1).toUpperCase()}</span><div><strong>{account ? `@${account.username}` : 'Your account'}</strong><small>Instagram preview</small></div></div>
-      {view === 'Post' && <div className="preview-post">{media?.thumbnailUrl ? <img src={media.thumbnailUrl} alt="Selected post" /> : <div className="preview-post-placeholder">{draft.target.kind === 'next' ? 'Your next post or reel' : draft.target.kind === 'all' ? 'Any post or reel' : 'Selected post or reel'}</div>}<p>{media?.caption || 'Your post caption appears here.'}</p></div>}
-      {view === 'Comments' && <div className="preview-comments"><p><strong>Example comment</strong><br />{draft.matching.mode === 'any' ? 'Interested!' : draft.matching.include[0] || 'Your keyword'}</p>{draft.publicReply ? <p><strong>{account ? `@${account.username}` : 'Your account'}</strong><br />{draft.replyVariations[0] || 'Add a public reply.'}</p> : <p className="muted">Public replies are off.</p>}</div>}
+      {(view === 'Post' || view === 'Comments') && postContext}
+      {view === 'Comments' && <section className="preview-comments" aria-label="Comments preview"><h3>Comments</h3><p><strong>Example comment</strong><br />{draft.matching.mode === 'any' ? 'Interested!' : draft.matching.include[0] || 'Your keyword'}</p>{draft.publicReply ? <p><strong>{account ? `@${account.username}` : 'Your account'}</strong><br />{draft.replyVariations[0] || 'Add a public reply.'}</p> : <p className="muted">Public replies are off.</p>}</section>}
       {view === 'DM' && <div className="preview-messages">{!draft.privateReply ? <p className="preview-system">Private messages are off for this campaign.</p> : result.items.map(({ node, eventIndex, waiting, linkVisited }) => {
         const visit = events[eventIndex];
         const responseIndex = visit?.kind === 'visit' && visit.nodeId === node.id ? eventIndex + 1 : eventIndex;
@@ -40,6 +41,6 @@ export function CampaignPreview({ draft, account, media }: { draft: CampaignInpu
         {node.kind === 'action' && <div className="preview-system">Apply tag: {node.tag}</div>}
         {node.kind === 'end' && <div className="preview-system">{node.outcome === 'handoff' ? 'Hand off to a person' : 'Conversation complete'}</div>}
       </div>; })}{result.windowClosed && <p className="preview-system">The messaging window has closed, so the next message cannot be sent.</p>}</div>}
-    </div><p className="preview-footnote">Link visits are simulated and do not count as replies.</p>
+    </div>{view === 'DM' && <p className="preview-footnote">Link visits are simulated and do not count as replies.</p>}
   </aside>;
 }
