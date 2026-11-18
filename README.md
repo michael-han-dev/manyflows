@@ -23,6 +23,12 @@ For frontend hot reload, run `npm run dev` in another terminal and open the prin
 
 Use the demo setup control to add simulated accounts and content, then create and publish a campaign. The developer tools submit comments and responses through the backend without contacting Instagram. Simulated messages are not real Instagram deliveries.
 
+## Testing
+
+This repository strictly uses end-to-end (E2E) testing. Do not add unit tests or unit-test frameworks. Add regression coverage to the Playwright suite in `tests/e2e/`.
+
+Run `npm run test:e2e` to build the frontend and run the suite against a local Worker with isolated D1 storage. The suite simulates Meta API responses and does not require live Instagram credentials. Run `npm run check` for TypeScript validation.
+
 ## Connect Instagram
 
 The local demo does not require a Meta developer account. Live integration requires a custom Meta app and authorization for each managed Instagram professional account.

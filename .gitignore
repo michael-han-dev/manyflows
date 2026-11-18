@@ -3,6 +3,8 @@ dist/
 .wrangler/
 .vite/
 .cache/
+/.audit/
+/audit/
 *.tsbuildinfo
 *.log
 npm-debug.log*
@@ -25,7 +27,17 @@ playwright-report/
 test-results/
 .DS_Store
 Thumbs.db
+*.swp
+*.swo
+*~
+*.orig
+*.rej
+.idea/
+.aws/
+*.pem
+*.key
 the_plan.md
 implement.md
 wrangler.production.jsonc
+wrangler.production.json
 manyflows_setup.md
