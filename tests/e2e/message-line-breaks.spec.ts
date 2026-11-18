@@ -27,6 +27,11 @@ test('message line breaks survive the preview and automation conversation', asyn
   for (const text of [opening, prompt, resource]) {
     const bubble = preview.locator('.preview-bubble > p').filter({ hasText: text });
     expect.soft(await bubble.innerText()).toBe(text);
+    if (text === opening) await preview.getByRole('button', { name: 'Send me the guide', exact: true }).click();
+    if (text === prompt && await preview.getByRole('textbox', { name: 'Preview email', exact: true }).count()) {
+      await preview.getByRole('textbox', { name: 'Preview email', exact: true }).fill('lines@example.com');
+      await preview.getByRole('button', { name: 'Send reply', exact: true }).click();
+    }
   }
   await page.getByRole('button', { name: 'Publish campaign', exact: true }).click();
   const snapshotSchema = z.object({
