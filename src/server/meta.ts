@@ -64,6 +64,18 @@ export async function graph(env: Env, account: AccountRow, path: string, params:
     throw new ApiError(503, 'Instagram could not be reached. Try again.');
   }
 }
+export async function followsAccount(env: Env, account: AccountRow, instagramId: string): Promise<boolean> {
+  if (account.mode === 'demo') {
+    if (!demoAllowed(env)) throw new ApiError(503, 'Demo follow checks are disabled outside localhost.');
+    const status = await one<{ value: string }>(env, 'SELECT value FROM settings WHERE key=?', `following:${account.id}:${instagramId}`);
+    if (status?.value === 'unavailable') throw new ApiError(503, 'Simulated follow check unavailable.');
+    return status?.value === 'true';
+  }
+  const result = z.object({ is_user_follow_business: z.boolean() }).safeParse(await graph(env, account, instagramId, { fields: 'is_user_follow_business' }));
+  if (!result.success) throw new ApiError(503, 'Instagram did not return a valid follow status. Try again.');
+  return result.data.is_user_follow_business;
+}
+
 export async function send(env: Env, account: AccountRow, action: { id: string; nodeId: string; kind: string; commentId: string; payload: unknown }): Promise<SendResult> {
   if (account.mode === 'demo') {
     if (!demoAllowed(env)) return { kind: 'rejected', retry: false, error: 'Demo sends are disabled outside localhost.' };

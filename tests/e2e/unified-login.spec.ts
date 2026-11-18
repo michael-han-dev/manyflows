@@ -122,3 +122,64 @@ test('shared business grant reconciles discovery, failures, expiry and revocatio
   expect((await request.delete('/api/accounts/example_ig_2', { data: { confirmation: 'DELETE' } })).ok()).toBeTruthy();
   expect(z.array(z.object({ n: z.number() })).parse(JSON.parse(database('SELECT COUNT(*) AS n FROM meta_grants')))[0]?.n).toBe(0);
 });
+
+test('live follow lookup validates Meta booleans, repeats for nonfollowers and recovers fail-closed', async ({ request }) => {
+  await login(request);
+  expect(await connect(request, 'follow_false')).toBe('connected');
+  const input = defaultCampaign('example_ig_1');
+  input.publicReply = false;
+  input.matching = { mode: 'phrase', include: ['VERIFYFOLLOW'], exclude: [] };
+  input.flow = { entry: 'opening', nodes: [
+    { id: 'opening', kind: 'message', text: 'Start verification', buttons: [{ kind: 'reply', label: 'Continue', next: 'follow' }], next: null },
+    { id: 'follow', kind: 'follow', text: 'Follow before the link.', buttonLabel: 'I followed', next: 'resource' },
+    { id: 'resource', kind: 'message', text: 'Verified live resource', buttons: [], next: 'done' },
+    { id: 'done', kind: 'end', outcome: 'complete' },
+  ] };
+  const saved = await request.post('/api/campaigns', { data: input });
+  expect(saved.ok()).toBeTruthy();
+  const campaignId = z.object({ id: z.string() }).parse(await saved.json()).id;
+  expect((await request.post(`/api/campaigns/${campaignId}/publish`)).ok()).toBeTruthy();
+  async function webhook(entry: unknown) {
+    database("UPDATE accounts SET next_send_at=0 WHERE id='example_ig_1'");
+    const raw = JSON.stringify({ object: 'instagram', entry: [entry] });
+    expect((await request.post('/webhooks/instagram', { data: raw, headers: { 'content-type': 'application/json', 'x-hub-signature-256': `sha256=${createHmac('sha256', 'e2e-meta-secret').update(raw).digest('hex')}` } })).ok()).toBeTruthy();
+    expect((await request.post('/api/demo/tick', { data: {} })).ok()).toBeTruthy();
+  }
+  let event = 0;
+  async function respond(senderId: string, payload: string) {
+    await webhook({ id: 'example_ig_1', messaging: [{ sender: { id: senderId }, recipient: { id: 'example_ig_1' }, timestamp: Date.now(), postback: { mid: `example_follow_event_${event++}`, payload, title: 'Continue' } }] });
+  }
+  const journeySchema = z.array(z.object({ id: z.string(), state: z.string(), node_id: z.string(), wake_at: z.number().nullable() }));
+  const journey = (senderId: string) => journeySchema.parse(JSON.parse(database(`SELECT runs.id,runs.state,runs.node_id,runs.wake_at FROM runs JOIN contacts ON contacts.id=runs.contact_id WHERE contacts.instagram_id='${senderId}'`) || '[]'))[0];
+  const payload = (runId: string, nodeId: string) => z.array(z.object({ token: z.string() })).parse(JSON.parse(database(`SELECT token FROM response_tokens WHERE run_id='${runId}' AND node_id='${nodeId}'`)))[0]?.token ?? '';
+  for (const [index, scenario] of ['follow_false', 'follow_true', 'follow_missing', 'follow_malformed', 'follow_error'].entries()) {
+    database("DELETE FROM settings WHERE key='clock'");
+    expect(await connect(request, scenario)).toBe('connected');
+    const senderId = `example_follow_sender_${index}`;
+    await webhook({ id: 'example_ig_1', changes: [{ field: 'comments', value: { id: `example_follow_comment_${index}`, from: { id: senderId, username: senderId }, media: { id: 'example_media' }, text: 'VERIFYFOLLOW' } }] });
+    await expect.poll(() => journey(senderId)?.state).toBe('waiting');
+    const runId = journey(senderId)?.id ?? '';
+    await respond(senderId, payload(runId, 'opening'));
+    if (scenario === 'follow_true') {
+      await expect.poll(() => journey(senderId)?.state).toBe('complete');
+      continue;
+    }
+    await expect.poll(() => journey(senderId)?.node_id).toBe('follow');
+    if (scenario === 'follow_false') {
+      await expect.poll(() => journey(senderId)?.state).toBe('waiting');
+      await respond(senderId, payload(runId, 'follow'));
+      await expect.poll(() => JSON.parse(database(`SELECT COUNT(*) AS n FROM messages WHERE run_id='${runId}' AND direction='out' AND text='Follow before the link.'`))[0]?.n).toBe(2);
+      await expect.poll(() => journey(senderId)?.state).toBe('waiting');
+    } else {
+      await expect.poll(() => journey(senderId)?.wake_at ?? 0).toBeGreaterThan(Date.now());
+    }
+    expect(JSON.parse(database(`SELECT COUNT(*) AS n FROM messages WHERE run_id='${runId}' AND text='Verified live resource'`))[0]?.n).toBe(0);
+    expect(await connect(request, 'follow_true')).toBe('connected');
+    if (scenario === 'follow_false') await respond(senderId, payload(runId, 'follow'));
+    else expect((await request.post('/api/demo/tick', { data: { now: Date.now() + 61000 } })).ok()).toBeTruthy();
+    await expect.poll(() => journey(senderId)?.state).toBe('complete');
+    expect(JSON.parse(database(`SELECT COUNT(*) AS n FROM messages WHERE run_id='${runId}' AND text='Verified live resource'`))[0]?.n).toBe(1);
+    if (scenario === 'follow_false') await respond(senderId, payload(runId, 'follow'));
+    expect(JSON.parse(database(`SELECT COUNT(*) AS n FROM messages WHERE run_id='${runId}' AND text='Verified live resource'`))[0]?.n).toBe(1);
+  }
+});

@@ -17,13 +17,15 @@ const urlButton = z.object({ kind: z.literal('url'), label: z.string().min(1).ma
 export const buttonSchema = z.discriminatedUnion('kind', [replyButton, urlButton]);
 export const nodeSchema = z.discriminatedUnion('kind', [
   z.object({ id, kind: z.literal('message'), text, buttons: z.array(buttonSchema).max(MAX_MESSAGE_BUTTONS), next: nullableId }),
+  z.object({ id, kind: z.literal('follow'), text: text.min(1).max(BUTTON_MESSAGE_LIMIT), buttonLabel: z.string().min(1).max(BUTTON_LABEL_LIMIT), next: id }),
   z.object({ id, kind: z.literal('collect'), field: z.enum(['email', 'name', 'answer']), prompt: text.min(1), next: id }),
   z.object({ id, kind: z.literal('condition'), field: z.string().min(1).max(80), operator: z.enum(['equals', 'contains', 'has_tag', 'is_set']), value: z.string().max(200), yes: id, no: id }),
   z.object({ id, kind: z.literal('action'), tag: z.string().min(1).max(80), next: id }),
   z.object({ id, kind: z.literal('delay'), seconds: z.number().int().min(1).max(MAX_DELAY_SECONDS), next: id }),
   z.object({ id, kind: z.literal('end'), outcome: z.enum(['complete', 'handoff']) }),
 ]);
-export const flowSchema = z.object({ entry: id, nodes: z.array(nodeSchema).min(1).max(100) });
+const storedFlowSchema = z.object({ entry: id, nodes: z.array(nodeSchema).min(1).max(100) });
+export const flowSchema = storedFlowSchema.transform(upgradeLegacyFollowFlow);
 export const targetSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('all') }),
   z.object({ kind: z.literal('specific'), mediaId: id }),
@@ -42,7 +44,7 @@ export const campaignInputSchema = z.object({
 });
 
 export type FlowNode = z.infer<typeof nodeSchema>;
-export type Flow = z.infer<typeof flowSchema>;
+export type Flow = z.infer<typeof storedFlowSchema>;
 export type CampaignInput = z.infer<typeof campaignInputSchema>;
 export type Button = z.infer<typeof buttonSchema>;
 
@@ -206,7 +208,7 @@ export function nextNodes(node: FlowNode): string[] {
   switch (node.kind) {
     case 'message': return [...node.buttons.flatMap(button => button.kind === 'reply' ? [button.next] : []), ...(node.next ? [node.next] : [])];
     case 'condition': return [node.yes, node.no];
-    case 'collect': case 'action': case 'delay': return [node.next];
+    case 'follow': case 'collect': case 'action': case 'delay': return [node.next];
     case 'end': return [];
   }
 }
@@ -222,7 +224,7 @@ export function validateFlow(input: CampaignInput): string[] {
   const opening = nodes.get(input.flow.entry);
   if (input.privateReply && opening?.kind !== 'message') errors.push('The first private reply must be a message.');
   for (const node of input.flow.nodes) {
-    if (node.kind === 'message' && !node.text.trim()) errors.push(`Step ${node.id} needs message text.`);
+    if ((node.kind === 'message' || node.kind === 'follow') && !node.text.trim()) errors.push(`Step ${node.id} needs message text.`);
     if (node.kind === 'message' && node.buttons.length && node.text.length > BUTTON_MESSAGE_LIMIT) errors.push(`Step ${node.id} must use at most ${BUTTON_MESSAGE_LIMIT} characters with buttons.`);
     if (node.kind === 'message' && node.buttons.some(button => button.kind === 'reply') && node.next) errors.push(`Step ${node.id} cannot auto-advance while waiting for a button.`);
     for (const target of nextNodes(node)) if (!nodes.has(target)) errors.push(`Step ${node.id} points to missing step ${target}.`);
@@ -241,4 +243,21 @@ export function validateFlow(input: CampaignInput): string[] {
   visit(input.flow.entry);
   if (visited.size < nodes.size) errors.push('Every step must be reachable from the opening step.');
   return [...new Set(errors)];
+}
+
+export function upgradeLegacyFollowFlow(flow: Flow): Flow {
+  const nodes = new Map(flow.nodes.map(node => [node.id, node]));
+  const opening = nodes.get('opening'), follow = nodes.get('follow'), resource = nodes.get('resource'), email = nodes.get('email');
+  const delay = nodes.get('reminder_delay'), check = nodes.get('reminder_check'), reminder = nodes.get('reminder'), done = nodes.get('done');
+  if (flow.entry !== 'opening' || nodes.size !== flow.nodes.length || opening?.kind !== 'message' || follow?.kind !== 'message' || resource?.kind !== 'message' || done?.kind !== 'end') return flow;
+  if (opening.next !== null || opening.buttons.length !== 1 || opening.buttons[0]?.kind !== 'reply' || opening.buttons[0].next !== (email ? 'email' : 'follow')) return flow;
+  if (follow.next !== null || follow.buttons.length !== 1 || follow.buttons[0]?.kind !== 'reply' || follow.buttons[0].next !== 'resource' || !follow.text.trim() || follow.text.length > BUTTON_MESSAGE_LIMIT) return flow;
+  if (email && (email.kind !== 'collect' || email.field !== 'email' || email.next !== 'follow')) return flow;
+  if (resource.buttons.some(button => button.kind !== 'url') || resource.next !== (delay ? 'reminder_delay' : 'done') || done.outcome !== 'complete') return flow;
+  if (delay) {
+    if (delay.kind !== 'delay' || delay.next !== 'reminder_check' || check?.kind !== 'condition' || check.field !== '$link_clicked' || check.operator !== 'is_set' || check.value !== '' || check.yes !== 'done' || check.no !== 'reminder' || reminder?.kind !== 'message' || reminder.buttons.length || reminder.next !== 'done') return flow;
+  } else if (check || reminder) return flow;
+  if (flow.nodes.length !== 4 + Number(Boolean(email)) + (delay ? 3 : 0)) return flow;
+  const buttonLabel = follow.buttons[0].label;
+  return { ...flow, nodes: flow.nodes.map(node => node === follow ? { id: follow.id, kind: 'follow', text: follow.text, buttonLabel, next: 'resource' } : node) };
 }

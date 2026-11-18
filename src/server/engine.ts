@@ -3,7 +3,7 @@ import { MESSAGING_WINDOW_SECONDS, PRIVATE_REPLY_WINDOW_SECONDS, campaignInputSc
 import { digest } from './auth';
 import { accountSelect, baseUrl, buttons, contact, demoAllowed, now, one, rows, run, statement, uid, type AccountRow, type ActionRow, type CampaignRow, type ContactRow, type Env, type RunRow } from './core';
 import { eventSchema, queueEvent, type Event } from './events';
-import { bindNext, send, syncAccount } from './meta';
+import { bindNext, followsAccount, send, syncAccount } from './meta';
 
 function matches(input: CampaignInput, text: string) {
   const normalized = text.normalize('NFKC').toLocaleLowerCase('en');
@@ -53,7 +53,7 @@ async function processResponse(env: Env, event: Extract<Event, { kind: 'response
   const time = await now(env);
   const contactId = await digest(`${event.accountId}:${event.senderId}`);
   await run(env, 'INSERT OR IGNORE INTO contacts(id,account_id,instagram_id,username,created_at) VALUES(?,?,?,?,?)', contactId, event.accountId, event.senderId, event.username, time);
-  const token = event.payload ? await one<{ run_id: string; node_id: string; next_node_id: string }>(env, 'SELECT * FROM response_tokens WHERE token=? AND account_id=? AND contact_id=? AND used_at IS NULL', event.payload, event.accountId, contactId) : null;
+  let token = event.payload ? await one<{ run_id: string; node_id: string; next_node_id: string }>(env, 'SELECT * FROM response_tokens WHERE token=? AND account_id=? AND contact_id=? AND used_at IS NULL', event.payload, event.accountId, contactId) : null;
   const candidate = event.payload
     ? token ? await one<RunRow>(env, 'SELECT * FROM runs WHERE id=?', token.run_id) : null
     : await one<RunRow>(env, "SELECT * FROM runs WHERE account_id=? AND contact_id=? AND state IN ('running','waiting') ORDER BY created_at DESC,id DESC LIMIT 1", event.accountId, contactId);
@@ -71,15 +71,24 @@ async function processResponse(env: Env, event: Extract<Event, { kind: 'response
   let advanced = false;
   try {
     const active = lease.journey;
+    if (event.payload) token = await one(env, 'SELECT * FROM response_tokens WHERE token=? AND account_id=? AND contact_id=? AND used_at IS NULL', event.payload, event.accountId, contactId);
     if (active.state === 'running') return 'deferred';
-    const prompt = await one<{ started_at: number }>(env, "SELECT started_at FROM actions WHERE run_id=? AND node_id=? AND kind!='public' AND status='succeeded' AND started_at IS NOT NULL", active.id, active.node_id);
+    const input = await campaignInput(env, active.version_id);
+    const node = input.flow.nodes.find(node => node.id === active.node_id);
+    const prompt = await one<{ started_at: number }>(env, `SELECT started_at FROM actions WHERE run_id=? AND COALESCE(flow_node_id,node_id)=? AND kind!='public' AND status='succeeded' AND started_at IS NOT NULL ORDER BY started_at ${node?.kind === 'follow' ? 'ASC' : 'DESC'} LIMIT 1`, active.id, active.node_id);
+    let repeat = false;
     let target: string | null = null;
     let captured: { field: 'email' | 'name' | 'answer'; value: string } | null = null;
     if (active.state === 'waiting' && prompt && event.timestamp >= prompt.started_at) {
-      if (token && token.node_id === active.node_id) target = token.next_node_id;
+      if (token && token.node_id === active.node_id) {
+        if (node?.kind === 'follow') {
+          const account = await one<AccountRow>(env, `${accountSelect} WHERE id=?`, event.accountId);
+          if (!account) throw new Error('Missing account');
+          if (await followsAccount(env, account, event.senderId)) target = node.next;
+          else repeat = true;
+        } else target = token.next_node_id;
+      }
       else if (!event.payload) {
-        const input = await campaignInput(env, active.version_id);
-        const node = input.flow.nodes.find(node => node.id === active.node_id);
         if (node?.kind === 'collect') {
           const value = event.text.trim();
           if (value && (node.field !== 'email' || z.email().safeParse(value).success)) { captured = { field: node.field, value }; target = node.next; }
@@ -87,6 +96,12 @@ async function processResponse(env: Env, event: Extract<Event, { kind: 'response
       }
     }
     const statements = [];
+    if (repeat && node?.kind === 'follow') {
+      const occurrence = `follow-repeat:${event.id}`;
+      statements.push(statement(env, "UPDATE runs SET state='running',wake_at=NULL,last_event_id=?,updated_at=? WHERE id=? AND lock_token=? AND NOT EXISTS(SELECT 1 FROM events WHERE id=? AND applied_at IS NOT NULL)", event.id, time, active.id, lease.token, event.id));
+      statements.push(statement(env, "INSERT OR IGNORE INTO actions(id,account_id,run_id,node_id,flow_node_id,kind,text,buttons,available_at,created_at,updated_at) SELECT ?,?,?,?,?,'dm',?,?,?,?,? WHERE EXISTS(SELECT 1 FROM runs WHERE id=? AND last_event_id=?)", `${active.id}:${occurrence}`, event.accountId, active.id, occurrence, node.id, node.text, JSON.stringify([{ kind: 'reply', label: node.buttonLabel, next: node.next }]), time, time, time, active.id, event.id));
+      advanced = true;
+    }
     if (target) {
       statements.push(statement(env, "UPDATE runs SET node_id=?,state='running',wake_at=NULL,last_event_id=?,updated_at=? WHERE id=? AND lock_token=? AND NOT EXISTS(SELECT 1 FROM events WHERE id=? AND applied_at IS NOT NULL)", target, event.id, time, active.id, lease.token, event.id));
       if (captured) statements.push(statement(env, 'UPDATE contacts SET fields=json_set(fields,?,?) WHERE id=? AND EXISTS(SELECT 1 FROM runs WHERE id=? AND last_event_id=?)', `$.${captured.field}`, captured.value, contactId, active.id, event.id));
@@ -132,8 +147,8 @@ async function preparePayload(env: Env, item: ActionRow, journey: RunRow, person
   const visibleButtons: Button[] = [];
   for (const [index, button] of savedButtons.entries()) {
     if (button.kind === 'reply') {
-      await run(env, 'INSERT OR IGNORE INTO response_tokens(token,account_id,contact_id,run_id,node_id,next_node_id,choice) VALUES(?,?,?,?,?,?,?)', uid(), journey.account_id, journey.contact_id, journey.id, item.node_id, button.next, index);
-      const record = await one<{ token: string }>(env, 'SELECT token FROM response_tokens WHERE run_id=? AND node_id=? AND choice=?', journey.id, item.node_id, index);
+      await run(env, 'INSERT OR IGNORE INTO response_tokens(token,account_id,contact_id,run_id,node_id,next_node_id,choice) VALUES(?,?,?,?,?,?,?)', uid(), journey.account_id, journey.contact_id, journey.id, item.flow_node_id ?? item.node_id, button.next, index);
+      const record = await one<{ token: string }>(env, 'SELECT token FROM response_tokens WHERE run_id=? AND node_id=? AND choice=?', journey.id, item.flow_node_id ?? item.node_id, index);
       if (!record) throw new Error('Missing response token');
       outboundButtons.push({ type: 'postback', title: button.label, payload: record.token }); visibleButtons.push(button);
     } else {
@@ -171,7 +186,7 @@ async function executeAction(env: Env, item: ActionRow, journey: RunRow, person:
   }
   const payload = await preparePayload(env, item, journey, person);
   const claimed = await statement(env, "UPDATE actions SET status='executing',attempts=attempts+1,started_at=?,updated_at=? WHERE id=? AND status='pending' RETURNING id", time, time, item.id).first(); if (!claimed) return 'wait';
-  const result = await send(env, account, { id: item.id, nodeId: item.node_id, kind: item.kind, commentId: journey.comment_id, payload });
+  const result = await send(env, account, { id: item.id, nodeId: item.flow_node_id ?? item.node_id, kind: item.kind, commentId: journey.comment_id, payload });
   const currentButtons = await one<{ buttons: string }>(env, 'SELECT buttons FROM actions WHERE id=?', item.id);
   if (result.kind === 'accepted') {
     await env.DB.batch([statement(env, "UPDATE actions SET status='succeeded',provider_id=?,error=NULL,updated_at=? WHERE id=?", result.id, time, item.id), statement(env, "INSERT OR IGNORE INTO messages(id,account_id,contact_id,run_id,direction,channel,text,buttons,status,created_at) VALUES(?,?,?,?,'out',?,?,?,'accepted',?)", item.id, journey.account_id, person.id, journey.id, item.kind === 'public' ? 'public' : 'dm', item.text, currentButtons?.buttons ?? '[]', time), ...(item.kind === 'private' ? [statement(env, 'UPDATE runs SET private_sent=1 WHERE id=?', journey.id)] : [])]);
@@ -217,6 +232,28 @@ export async function resumeRun(env: Env, runId: string) {
             if (nextNode?.kind !== 'end') { await run(env, "UPDATE runs SET state='waiting',wake_at=NULL,updated_at=? WHERE id=?", time, runId); return; }
           }
           break;
+        }
+        case 'follow': {
+          if (!person.last_interaction_at || !journey.private_sent) throw new Error('Follow verification requires an opening interaction.');
+          let item = await one<ActionRow>(env, "SELECT * FROM actions WHERE run_id=? AND COALESCE(flow_node_id,node_id)=? AND kind='dm' ORDER BY rowid DESC LIMIT 1", runId, node.id);
+          if (!item) {
+            const account = await one<AccountRow>(env, `${accountSelect} WHERE id=?`, journey.account_id);
+            if (!account) throw new Error('Missing account');
+            let following: boolean;
+            try { following = await followsAccount(env, account, person.instagram_id); }
+            catch {
+              await run(env, 'UPDATE runs SET wake_at=?,updated_at=? WHERE id=?', time + 60000, time, runId);
+              return;
+            }
+            if (following) { next = node.next; break; }
+            const actionId = `${runId}:${node.id}:dm`;
+            await run(env, "INSERT OR IGNORE INTO actions(id,account_id,run_id,node_id,kind,text,buttons,available_at,created_at,updated_at) VALUES(?,?,?,?,'dm',?,?,?,?,?)", actionId, journey.account_id, runId, node.id, node.text, JSON.stringify([{ kind: 'reply', label: node.buttonLabel, next: node.next }]), time, time, time);
+            item = await one<ActionRow>(env, 'SELECT * FROM actions WHERE id=?', actionId);
+          }
+          if (!item) throw new Error('Missing follow prompt');
+          if (await executeAction(env, item, journey, person) !== 'done') return;
+          await run(env, "UPDATE runs SET state='waiting',wake_at=NULL,updated_at=? WHERE id=?", time, runId);
+          return;
         }
         case 'condition': {
           const personData = contact(person);

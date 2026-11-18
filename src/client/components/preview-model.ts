@@ -3,17 +3,19 @@ import { MESSAGING_WINDOW_SECONDS, type Button, type CampaignInput, type FlowNod
 type NodeOf<K extends FlowNode['kind']> = Extract<FlowNode, { kind: K }>;
 
 export type PreviewChoice =
+  | { kind: 'follow'; nodeId: string; following: boolean }
   | { kind: 'reply'; nodeId: string; index: number; button: Extract<Button, { kind: 'reply' }> }
   | { kind: 'visit'; nodeId: string; index: number; button: Extract<Button, { kind: 'url' }> }
   | { kind: 'condition'; nodeId: string; condition: NodeOf<'condition'>; matched: boolean };
 
 type PreviewStep =
+  | (NodeOf<'follow'> & { following: boolean })
   | (NodeOf<'message'> & { response: string | null; replyIndex: number | null; visitedIndex: number | null })
   | (NodeOf<'collect'> & { answer: string })
   | (NodeOf<'condition'> & { matched: boolean; assumed: boolean; linkVisited: boolean })
   | NodeOf<'action' | 'delay' | 'end'>;
 
-type PreviewResult = { steps: PreviewStep[]; validChoices: PreviewChoice[]; stop: 'finished' | 'window-closed' | 'invalid-path' };
+type PreviewResult = { steps: PreviewStep[]; validChoices: PreviewChoice[]; stop: 'finished' | 'window-closed' | 'invalid-path' | 'awaiting-follow' };
 
 const exampleAnswers = { email: 'alex@example.com', name: 'Alex', answer: 'Example answer' } satisfies Record<NodeOf<'collect'>['field'], string>;
 
@@ -23,6 +25,7 @@ export function previewCampaign(input: CampaignInput, choices: readonly PreviewC
   for (const node of input.flow.nodes) nodes.set(node.id, nodes.has(node.id) ? undefined : node);
   const validChoices = choices.filter(choice => {
     const node = nodes.get(choice.nodeId);
+    if (choice.kind === 'follow') return node?.kind === 'follow';
     if (choice.kind === 'condition') {
       const saved = choice.condition;
       return node?.kind === 'condition' && node.field !== '$link_clicked'
@@ -48,7 +51,7 @@ export function previewCampaign(input: CampaignInput, choices: readonly PreviewC
     const node = nodes.get(id);
     if (!node || seen.has(id)) return { steps, validChoices, stop: 'invalid-path' };
     seen.add(id);
-    if ((node.kind === 'message' || node.kind === 'collect') && id !== input.flow.entry && (!engaged || elapsed >= MESSAGING_WINDOW_SECONDS)) {
+    if ((node.kind === 'message' || node.kind === 'collect' || node.kind === 'follow') && id !== input.flow.entry && (!engaged || elapsed >= MESSAGING_WINDOW_SECONDS)) {
       return { steps, validChoices, stop: 'window-closed' };
     }
     switch (node.kind) {
@@ -69,6 +72,14 @@ export function previewCampaign(input: CampaignInput, choices: readonly PreviewC
         }
         if (response !== null) { engaged = true; elapsed = 0; }
         steps.push({ ...node, response, replyIndex: replyIndex < 0 ? null : replyIndex, visitedIndex });
+        break;
+      }
+      case 'follow': {
+        const choice = validChoices.find(choice => choice.kind === 'follow' && choice.nodeId === node.id);
+        const following = choice?.kind === 'follow' ? choice.following : true;
+        steps.push({ ...node, following });
+        if (!following) return { steps, validChoices, stop: 'awaiting-follow' };
+        id = node.next;
         break;
       }
       case 'collect': {

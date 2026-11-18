@@ -1,4 +1,4 @@
-import { defaultCampaign, DEFAULT_REMINDER_SECONDS, MAX_MESSAGE_BUTTONS, type Button, type Flow, type FlowNode } from '../../shared/domain';
+import { defaultCampaign, DEFAULT_REMINDER_SECONDS, MAX_MESSAGE_BUTTONS, type Button, type Flow, type FlowNode, upgradeLegacyFollowFlow } from '../../shared/domain';
 
 type UrlButton = Extract<Button, { kind: 'url' }>;
 export type TemplateModel = {
@@ -26,7 +26,8 @@ function sameStoredValue(left: unknown, right: unknown): boolean {
   return sameStoredValue(leftEntries, rightEntries);
 }
 
-export function readTemplate(flow: Flow): TemplateModel | null {
+export function readTemplate(stored: Flow): TemplateModel | null {
+  const flow = upgradeLegacyFollowFlow(stored);
   const byId = new Map(flow.nodes.map(node => [node.id, node]));
   if (byId.size !== flow.nodes.length) return null;
   const opening = byId.get('opening');
@@ -38,10 +39,9 @@ export function readTemplate(flow: Flow): TemplateModel | null {
   if (resource?.kind !== 'message' || resource.buttons.length > MAX_MESSAGE_BUTTONS || resource.buttons.some(button => button.kind !== 'url')) return null;
   const resourceLinks = resource.buttons.filter((button): button is UrlButton => button.kind === 'url');
   const openingButton = opening?.kind === 'message' ? opening.buttons[0] : undefined;
-  const followButton = follow?.kind === 'message' ? follow.buttons[0] : undefined;
   if (opening && (opening.kind !== 'message' || openingButton?.kind !== 'reply')) return null;
   if (email && email.kind !== 'collect') return null;
-  if (follow && (follow.kind !== 'message' || followButton?.kind !== 'reply')) return null;
+  if (follow && follow.kind !== 'follow') return null;
   if (delay && delay.kind !== 'delay') return null;
   if (reminder && reminder.kind !== 'message') return null;
   const model: TemplateModel = {
@@ -49,8 +49,8 @@ export function readTemplate(flow: Flow): TemplateModel | null {
     opening: Boolean(opening), openingText: opening?.kind === 'message' ? opening.text : defaults.openingText,
     openingButton: openingButton?.kind === 'reply' ? openingButton.label : defaults.openingButton,
     email: Boolean(email), emailPrompt: email?.kind === 'collect' ? email.prompt : defaults.emailPrompt,
-    follow: Boolean(follow), followText: follow?.kind === 'message' ? follow.text : defaults.followText,
-    followButton: followButton?.kind === 'reply' ? followButton.label : defaults.followButton,
+    follow: Boolean(follow), followText: follow?.kind === 'follow' ? follow.text : defaults.followText,
+    followButton: follow?.kind === 'follow' ? follow.buttonLabel : defaults.followButton,
     resourceText: resource.text, resourceLinks,
     reminder: Boolean(delay), reminderText: reminder?.kind === 'message' ? reminder.text : defaults.reminderText,
     reminderSeconds: delay?.kind === 'delay' ? delay.seconds : defaults.reminderSeconds,
@@ -67,7 +67,7 @@ export function writeTemplate(model: TemplateModel): Flow {
   const nodes: FlowNode[] = [];
   if (model.opening) nodes.push({ id: 'opening', kind: 'message', text: model.openingText, buttons: [{ kind: 'reply', label: model.openingButton, next: model.email ? 'email' : model.follow ? 'follow' : 'resource' }], next: null });
   if (model.opening && model.email) nodes.push({ id: 'email', kind: 'collect', field: 'email', prompt: model.emailPrompt, next: model.follow ? 'follow' : 'resource' });
-  if (model.opening && model.follow) nodes.push({ id: 'follow', kind: 'message', text: model.followText, buttons: [{ kind: 'reply', label: model.followButton, next: 'resource' }], next: null });
+  if (model.opening && model.follow) nodes.push({ id: 'follow', kind: 'follow', text: model.followText, buttonLabel: model.followButton, next: 'resource' });
   nodes.push({ id: 'resource', kind: 'message', text: model.resourceText, buttons: model.resourceLinks, next: model.opening && model.reminder ? 'reminder_delay' : 'done' });
   if (model.opening && model.reminder) {
     nodes.push({ id: 'reminder_delay', kind: 'delay', seconds: model.reminderSeconds, next: 'reminder_check' });

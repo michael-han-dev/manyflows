@@ -365,6 +365,11 @@ test('guided email and follow confirmation gate multiple resources and reminders
     expect(sent().some(item => item.text === 'Your resources are ready.')).toBeFalsy();
     await post(request, '/api/demo/respond', { accountId: 'demo-studio', username, runId: journey.id, buttonIndex: 0 });
     current = await state(request);
+    expect(sent().some(item => item.text === 'Your resources are ready.')).toBeFalsy();
+    expect(sent().filter(item => item.text === 'Please follow, then confirm.')).toHaveLength(2);
+    await post(request, '/api/demo/following', { accountId: 'demo-studio', username, status: 'following' });
+    await post(request, '/api/demo/respond', { accountId: 'demo-studio', username, runId: journey.id, buttonIndex: 0 });
+    current = await state(request);
     const resource = sent().find(item => item.text === 'Your resources are ready.');
     if (!resource) throw new Error('No resource message was sent after confirmation.');
     expect(resource.buttons).toHaveLength(3);
@@ -474,4 +479,153 @@ test('confirmed account deletion removes dependent data and leaves other account
   expect(exported.versions.some(item => item.campaignId === created.id)).toBeFalsy();
   expect(exported.links.some(item => item.accountId === 'demo-notes')).toBeFalsy();
   expect(exported.metricSnapshots.some(item => item.accountId === 'demo-notes')).toBeFalsy();
+});
+
+test('verified follow gate rejects text and duplicate taps, recovers lookup errors, and releases once', async ({ request }) => {
+  const initial = readTemplate(defaultCampaign('demo-studio').flow);
+  if (!initial) throw new Error('Missing guided template');
+  const created = await campaign(request, { publicReply: false, flow: writeTemplate({ ...initial, follow: true, resourceText: 'Verified resource', followText: 'Please follow first.' }) });
+  const username = `verified-${randomUUID().slice(0, 8)}`;
+  await comment(request, created.keyword, username);
+  let current = await state(request);
+  const journey = current.runs.find(item => item.campaignId === created.id);
+  if (!journey) throw new Error('Missing journey');
+  const sent = () => current.messages.filter(item => item.runId === journey.id && item.direction === 'out');
+  await post(request, '/api/demo/respond', { accountId: 'demo-studio', username, buttonIndex: 0 });
+  current = await state(request);
+  expect(current.runs.find(item => item.id === journey.id)).toMatchObject({ state: 'waiting', nodeId: 'follow' });
+  expect(sent().filter(item => item.text === 'Please follow first.')).toHaveLength(1);
+  await post(request, '/api/demo/respond', { accountId: 'demo-studio', username, text: 'I followed' });
+  const repeated = { accountId: 'demo-studio', username, buttonIndex: 0, eventId: `follow-${randomUUID()}` };
+  await post(request, '/api/demo/respond', repeated);
+  await post(request, '/api/demo/respond', repeated);
+  current = await state(request);
+  expect(sent().filter(item => item.text === 'Please follow first.')).toHaveLength(2);
+  expect(sent().some(item => item.text === 'Verified resource')).toBeFalsy();
+  await post(request, '/api/demo/following', { accountId: 'demo-studio', username, status: 'unavailable' });
+  await post(request, '/api/demo/respond', { accountId: 'demo-studio', username, buttonIndex: 0 });
+  current = await state(request);
+  expect(current.runs.find(item => item.id === journey.id)?.nodeId).toBe('follow');
+  expect(sent().some(item => item.text === 'Verified resource')).toBeFalsy();
+  await post(request, '/api/demo/following', { accountId: 'demo-studio', username, status: 'following' });
+  const clock = z.object({ now: z.number() }).parse(await (await post(request, '/api/demo/tick')).json()).now;
+  await post(request, '/api/demo/tick', { now: clock + 61000 });
+  current = await state(request);
+  expect(sent().filter(item => item.text === 'Verified resource')).toHaveLength(1);
+  expect(current.runs.find(item => item.id === journey.id)?.state).toBe('complete');
+  await post(request, '/api/demo/respond', { accountId: 'demo-studio', username, eventId: repeated.eventId, text: 'I followed' });
+  current = await state(request);
+  expect(sent().filter(item => item.text === 'Verified resource')).toHaveLength(1);
+});
+
+test('existing followers skip the follow prompt and uncertain repeats are retained', async ({ request }) => {
+  const initial = readTemplate(defaultCampaign('demo-studio').flow);
+  if (!initial) throw new Error('Missing template');
+  const created = await campaign(request, { publicReply: false, flow: writeTemplate({ ...initial, follow: true, resourceText: 'Follow resource', followText: 'Follow prompt' }) });
+  for (const following of [true, false]) {
+    const username = `follow-state-${randomUUID().slice(0, 8)}`;
+    await post(request, '/api/demo/following', { accountId: 'demo-studio', username, status: following ? 'following' : 'not_following' });
+    await comment(request, created.keyword, username);
+    let current = await state(request);
+    const person = current.contacts.find(item => item.username === username);
+    const journey = current.runs.find(item => item.campaignId === created.id && item.contactId === person?.id);
+    if (!journey) throw new Error('Missing journey');
+    await post(request, '/api/demo/respond', { accountId: 'demo-studio', username, runId: journey.id, buttonIndex: 0 });
+    current = await state(request);
+    if (following) {
+      expect(current.runs.find(item => item.id === journey.id)?.state).toBe('complete');
+      expect(current.messages.some(item => item.runId === journey.id && item.text === 'Follow prompt')).toBeFalsy();
+    } else {
+      await post(request, '/api/demo/failure', { accountId: 'demo-studio', mode: 'uncertain' });
+      await post(request, '/api/demo/respond', { accountId: 'demo-studio', username, runId: journey.id, buttonIndex: 0 });
+      current = await state(request);
+      expect(current.runs.find(item => item.id === journey.id)?.state).toBe('uncertain');
+      expect(current.messages.filter(item => item.runId === journey.id && item.text === 'Follow prompt').map(item => item.status).sort()).toEqual(['accepted', 'uncertain']);
+      const count = current.actions.filter(item => item.runId === journey.id).length;
+      await post(request, '/api/demo/tick');
+      expect((await state(request)).actions.filter(item => item.runId === journey.id)).toHaveLength(count);
+    }
+  }
+});
+
+test('a verified follow tap survives a paced repeat sent after the tap', async ({ request }) => {
+  const initial = readTemplate(defaultCampaign('demo-studio').flow);
+  if (!initial) throw new Error('Missing guided template');
+  const created = await campaign(request, { publicReply: false, flow: writeTemplate({ ...initial, follow: true, followText: 'Paced follow prompt', resourceText: 'Paced verified resource' }) });
+  const username = `paced-follow-${randomUUID().slice(0, 8)}`;
+  await comment(request, created.keyword, username);
+  await post(request, '/api/demo/respond', { accountId: 'demo-studio', username, buttonIndex: 0 });
+  let current = await state(request);
+  const journey = current.runs.find(item => item.campaignId === created.id);
+  if (!journey) throw new Error('Missing journey');
+  await post(request, '/api/demo/pacing', { accountId: 'demo-studio', milliseconds: 5000 });
+  await post(request, '/api/demo/respond', { accountId: 'demo-studio', username, buttonIndex: 0 });
+  await post(request, '/api/demo/respond', { accountId: 'demo-studio', username, buttonIndex: 0 });
+  current = await state(request);
+  expect(current.runs.find(item => item.id === journey.id)?.state).toBe('running');
+  await post(request, '/api/demo/following', { accountId: 'demo-studio', username, status: 'following' });
+  await post(request, '/api/demo/respond', { accountId: 'demo-studio', username, buttonIndex: 0 });
+  const time = z.object({ now: z.number() }).parse(await (await post(request, '/api/demo/tick')).json()).now;
+  await post(request, '/api/demo/tick', { now: time + 6000 });
+  await post(request, '/api/demo/tick', { now: time + 67000 });
+  await post(request, '/api/demo/tick', { now: time + 73000 });
+  current = await state(request);
+  expect(current.runs.find(item => item.id === journey.id)?.state).toBe('complete');
+  expect(current.messages.filter(item => item.runId === journey.id && item.text === 'Paced verified resource')).toHaveLength(1);
+  await post(request, '/api/demo/pacing', { accountId: 'demo-studio', milliseconds: 0 });
+});
+
+test('one unavailable follow lookup does not block another account scheduled resource', async ({ request }) => {
+  const initial = readTemplate(defaultCampaign('demo-studio').flow);
+  if (!initial) throw new Error('Missing template');
+  const blocked = await campaign(request, { publicReply: false, flow: writeTemplate({ ...initial, follow: true, resourceText: 'Blocked account resource' }) });
+  const username = `outage-follow-${randomUUID().slice(0, 8)}`;
+  await post(request, '/api/demo/following', { accountId: 'demo-studio', username, status: 'unavailable' });
+  await comment(request, blocked.keyword, username);
+  await post(request, '/api/demo/respond', { accountId: 'demo-studio', username, buttonIndex: 0 });
+  const other = await campaign(request, { accountId: 'demo-notes', publicReply: false, flow: { entry: 'opening', nodes: [
+    { id: 'opening', kind: 'message', text: 'Other opening', buttons: [{ kind: 'reply', label: 'Continue', next: 'wait' }], next: null },
+    { id: 'wait', kind: 'delay', seconds: 1, next: 'resource' },
+    { id: 'resource', kind: 'message', text: 'Other scheduled resource', buttons: [], next: 'done' },
+    { id: 'done', kind: 'end', outcome: 'complete' },
+  ] } });
+  const otherUsername = `other-follow-${randomUUID().slice(0, 8)}`;
+  await post(request, '/api/demo/comment', { accountId: 'demo-notes', mediaId: 'demo-reel-notes', username: otherUsername, text: other.keyword });
+  await post(request, '/api/demo/respond', { accountId: 'demo-notes', username: otherUsername, buttonIndex: 0 });
+  const time = z.object({ now: z.number() }).parse(await (await post(request, '/api/demo/tick')).json()).now;
+  await post(request, '/api/demo/tick', { now: time + 61000 });
+  const current = await state(request);
+  const blockedRun = current.runs.find(item => item.campaignId === blocked.id);
+  const otherRun = current.runs.find(item => item.campaignId === other.id);
+  expect(blockedRun).toMatchObject({ state: 'running', nodeId: 'follow' });
+  expect(blockedRun?.wakeAt).toBeGreaterThan(time + 61000);
+  expect(current.messages.some(item => item.runId === blockedRun?.id && item.text === 'Blocked account resource')).toBeFalsy();
+  expect(otherRun?.state).toBe('complete');
+  expect(current.messages.filter(item => item.runId === otherRun?.id && item.text === 'Other scheduled resource')).toHaveLength(1);
+  await post(request, '/api/demo/following', { accountId: 'demo-studio', username, status: 'following' });
+  await post(request, '/api/demo/tick', { now: time + 122000 });
+  expect((await state(request)).runs.find(item => item.campaignId === blocked.id)?.state).toBe('complete');
+});
+
+test('legacy guided follow messages become verified gates and custom follow messages retain their meaning', async ({ request }) => {
+  const legacy = defaultCampaign('demo-studio');
+  legacy.publicReply = false;
+  legacy.flow.nodes.splice(1, 0, { id: 'follow', kind: 'message', text: 'Legacy follow request', buttons: [{ kind: 'reply', label: 'I followed', next: 'resource' }], next: null });
+  const opening = legacy.flow.nodes[0];
+  if (opening?.kind !== 'message' || opening.buttons[0]?.kind !== 'reply') throw new Error('Missing opening button');
+  opening.buttons[0].next = 'follow';
+  const guided = await campaign(request, { flow: legacy.flow, publicReply: false });
+  expect((await state(request)).campaigns.find(item => item.id === guided.id)?.draft.flow.nodes.find(node => node.id === 'follow')?.kind).toBe('follow');
+  const username = `legacy-follow-${randomUUID().slice(0, 8)}`;
+  await comment(request, guided.keyword, username);
+  await post(request, '/api/demo/respond', { accountId: 'demo-studio', username, buttonIndex: 0 });
+  await post(request, '/api/demo/respond', { accountId: 'demo-studio', username, buttonIndex: 0 });
+  let current = await state(request);
+  const journey = current.runs.find(item => item.campaignId === guided.id);
+  expect(journey).toMatchObject({ nodeId: 'follow', state: 'waiting' });
+  expect(current.messages.filter(item => item.runId === journey?.id && item.text === 'Legacy follow request')).toHaveLength(2);
+  opening.buttons.push({ kind: 'reply', label: 'Skip request', next: 'resource' });
+  const custom = await campaign(request, { flow: legacy.flow, publicReply: false });
+  current = await state(request);
+  expect(current.campaigns.find(item => item.id === custom.id)?.draft.flow.nodes.find(node => node.id === 'follow')?.kind).toBe('message');
 });

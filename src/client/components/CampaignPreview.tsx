@@ -30,6 +30,10 @@ export function CampaignPreview({ draft, account, media }: { draft: CampaignInpu
             : <button key={index} aria-pressed={step.visitedIndex === index} onClick={() => toggleVisit({ kind: 'visit', nodeId: step.id, index, button }, step.visitedIndex === index)}>{button.label || 'Visit link'} <small>({step.visitedIndex === index ? 'visited' : 'simulate visit'})</small></button>)}</div>
           {step.response !== null && <p className="preview-response">{step.response}</p>}
         </>}
+        {step.kind === 'follow' && <>
+          <div className="preview-system"><span>Instagram follow check</span><div className="preview-condition-result" role="group" aria-label="Example follow status"><button aria-pressed={step.following} onClick={() => choose({ kind: 'follow', nodeId: step.id, following: true })}>Following</button><button aria-pressed={!step.following} onClick={() => choose({ kind: 'follow', nodeId: step.id, following: false })}>Not following</button></div></div>
+          {step.following ? <p className="preview-system">Follow verified. Continue to the resource.</p> : <><div className="preview-bubble"><p>{step.text}</p><button onClick={() => choose({ kind: 'follow', nodeId: step.id, following: false })}>{step.buttonLabel}</button></div><p className="preview-system">Still not following. Each tap repeats this prompt until the follow is verified.</p></>}
+        </>}
         {step.kind === 'collect' && <><div className="preview-bubble"><p>{step.prompt}</p></div><p className="preview-response">{step.answer}</p></>}
         {step.kind === 'delay' && <div className="preview-system">After {step.seconds} seconds</div>}
         {step.kind === 'condition' && (step.field === '$link_clicked'

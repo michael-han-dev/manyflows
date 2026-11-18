@@ -1,4 +1,4 @@
-const scenarios = new Set(['success', 'discovery_failure', 'partial', 'empty_cursor', 'cursor_loop', 'reauth', 'revoked', 'expired', 'hostile', 'conflicting_duplicate']);
+const scenarios = new Set(['success', 'discovery_failure', 'partial', 'empty_cursor', 'cursor_loop', 'reauth', 'revoked', 'expired', 'hostile', 'conflicting_duplicate', 'follow_true', 'follow_false', 'follow_missing', 'follow_malformed', 'follow_error']);
 
 function reply(body: unknown, status = 200) {
   return Response.json(body, { status });
@@ -40,6 +40,13 @@ export async function metaFetch(input: RequestInfo | URL, init?: RequestInit): P
   if (/^example_ig_[12]\/media$/.test(path) && request.method === 'GET') {
     if (scenario === 'revoked') return reply({ error: { code: 190, message: 'example private revoked detail' } }, 400);
     return reply({ data: [] });
+  }
+  if (/^example_follow_sender_[0-9]+$/.test(path) && request.method === 'GET') {
+    if (url.searchParams.get('fields') !== 'is_user_follow_business' || [...url.searchParams.keys()].length !== 1) throw new Error('Unexpected follow profile fields');
+    if (scenario === 'follow_missing') return reply({ id: path });
+    if (scenario === 'follow_malformed') return reply({ is_user_follow_business: 'true' });
+    if (scenario === 'follow_error') return reply({ error: { code: 10, message: 'example private profile error' } }, 400);
+    return reply({ is_user_follow_business: scenario === 'follow_true' });
   }
   if ((/^example_ig_[12]\/messages$/.test(path) || /^example_comment\/replies$/.test(path)) && request.method === 'POST') {
     if (!request.headers.get('content-type')?.includes('application/json')) throw new Error('Unexpected Meta send content type');

@@ -40,6 +40,12 @@ demo.post('/api/demo/respond', async c => {
   const ids = await ingest(c.env, { object: 'instagram', entry: [{ id: input.accountId, messaging: [{ sender: { id: `demo-user:${input.username}` }, recipient: { id: input.accountId }, timestamp: input.timestamp ?? await now(c.env), ...(payload ? { postback: { mid: eventId, payload, title: input.text ?? 'Button response' } } : { message: { mid: eventId, text: input.text ?? '' } }) }] }] });
   return c.json({ ok: true, eventId, ids });
 });
+demo.post('/api/demo/following', async c => {
+  const input = z.object({ accountId: z.string(), username: z.string().min(1).max(80), status: z.enum(['following', 'not_following', 'unavailable']) }).parse(await c.req.json());
+  await demoAccount(c.env, input.accountId);
+  await run(c.env, 'INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', `following:${input.accountId}:demo-user:${input.username}`, input.status === 'following' ? 'true' : input.status === 'not_following' ? 'false' : 'unavailable');
+  return c.json({ ok: true });
+});
 demo.post('/api/demo/tick', async c => {
   const input = z.object({ now: z.number().int().positive().optional() }).parse(await c.req.json().catch(() => ({})));
   if (input.now !== undefined) { const time = await now(c.env); if (input.now < time - 1000) throw new ApiError(400, 'The simulation clock can only move forward.'); await run(c.env, "INSERT INTO settings(key,value) VALUES('clock',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", String(input.now)); }

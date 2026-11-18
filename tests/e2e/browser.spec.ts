@@ -176,19 +176,22 @@ test('one-page builder shows the full example flow and preserves optional copy a
   }
   const stages = [
     { toggle: 'Collect an email', field: 'Email collection prompt', value: 'Send your email before the links.' },
-    { toggle: 'Follow confirmation', field: 'Follow confirmation message', value: 'Follow, then confirm to continue.' },
+    { toggle: 'Require a follow', field: 'Follow request message', value: 'Follow, then confirm to continue.' },
     { toggle: 'Send a reminder', field: 'Reminder message', value: 'Remember your links.' },
   ];
   for (const stage of stages) {
     await switchStep(stage.toggle, true);
     await page.getByRole('textbox', { name: stage.field, exact: true }).fill(stage.value);
+    if (stage.toggle === 'Require a follow') await preview.getByRole('button', { name: 'Not following', exact: true }).click();
     await expect(preview.getByText(stage.value, { exact: true })).toBeVisible();
     await switchStep(stage.toggle, false);
     await expect(preview.getByText(stage.value, { exact: true })).toHaveCount(0);
     await expect(preview.getByText('Here is your guide. Enjoy!', { exact: true })).toBeVisible();
     await switchStep(stage.toggle, true);
     await expect(page.getByRole('textbox', { name: stage.field, exact: true })).toHaveValue(stage.value);
+    if (stage.toggle === 'Require a follow') await preview.getByRole('button', { name: 'Not following', exact: true }).click();
     await expect(preview.getByText(stage.value, { exact: true })).toBeVisible();
+    if (stage.toggle === 'Require a follow') await preview.getByRole('button', { name: 'Following', exact: true }).click();
   }
   await page.getByRole('spinbutton', { name: 'Reminder minutes', exact: true }).fill('1');
   await switchStep('Opening message', false);
@@ -233,9 +236,17 @@ test('one-page builder shows the full example flow and preserves optional copy a
   await preview.getByRole('radio', { name: 'Post', exact: true }).click();
   await expect(preview.getByText('Any post or reel', { exact: true })).toBeVisible();
   await preview.getByRole('radio', { name: 'DM', exact: true }).click();
-  await expect(preview.locator('.preview-response')).toHaveText(['Send resources', 'alex@example.com', 'I followed']);
-  await expect(preview.locator('.preview-bubble > p')).toHaveText(['Your opening preview.', stages[0].value, stages[1].value, 'Here is your guide. Enjoy!', stages[2].value]);
+  await expect(preview.locator('.preview-response')).toHaveText(['Send resources', 'alex@example.com']);
+  await expect(preview.locator('.preview-bubble > p')).toHaveText(['Your opening preview.', stages[0].value, 'Here is your guide. Enjoy!', stages[2].value]);
   await expect(preview.getByText('After 60 seconds', { exact: true })).toBeVisible();
+  const followStatus = preview.getByRole('group', { name: 'Example follow status' });
+  await followStatus.getByRole('button', { name: 'Not following', exact: true }).click();
+  await expect(preview.getByText(stages[1].value, { exact: true })).toBeVisible();
+  await expect(preview.getByText('Here is your guide. Enjoy!', { exact: true })).toHaveCount(0);
+  await preview.getByRole('button', { name: 'I followed', exact: true }).click();
+  await expect(preview.getByText('Here is your guide. Enjoy!', { exact: true })).toHaveCount(0);
+  await followStatus.getByRole('button', { name: 'Following', exact: true }).click();
+  await expect(preview.getByText('Here is your guide. Enjoy!', { exact: true })).toBeVisible();
   await expect(preview.getByRole('textbox')).toHaveCount(0);
   await expect(preview.getByRole('button', { name: /^(Send reply|Simulate a reply|Advance time)$/ })).toHaveCount(0);
   await page.getByRole('textbox', { name: 'Resource message', exact: true }).fill('Updated resource preview.');
@@ -376,7 +387,6 @@ test('automatic preview evaluates example fields and tags and allows alternate p
   await preview.screenshot({ path: testInfo.outputPath('automatic-custom-preview.png'), animations: 'disabled' });
   expect(campaignsSchema.parse(await (await page.request.get('/api/bootstrap')).json()).campaigns.find(item => item.name === input.name)?.draft).toEqual(input);
 });
-
 
 test('ambiguous saved graphs are not silently converted to guided templates', async ({ page }) => {
   await signIn(page);

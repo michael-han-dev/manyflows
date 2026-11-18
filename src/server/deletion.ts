@@ -15,6 +15,7 @@ export async function deleteStoredData(env: Env, scope: DeletionScope) {
   const legacy = await rows<{ id: string }>(env, `SELECT id FROM events WHERE ${eventWhere} AND receipt_hash IS NULL`, ...eventArgs);
   const receipts = await Promise.all(legacy.map(event => digest(event.id)));
   const statements = [
+    guarded(scope.kind === 'account' ? 'DELETE FROM settings WHERE substr(key,1,length(?))=?' : 'DELETE FROM settings WHERE key=?', scope.kind === 'account' ? [`following:${scope.accountId}:`, `following:${scope.accountId}:`] : [`following:${scope.accountId}:${scope.instagramId}`]),
     guarded(`DELETE FROM clicks WHERE ${personWhere}`, personArgs),
     guarded(`DELETE FROM links WHERE ${personWhere}`, personArgs),
     guarded(`DELETE FROM response_tokens WHERE ${personWhere}`, personArgs),
