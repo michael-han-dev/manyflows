@@ -89,11 +89,10 @@ export function CampaignEditor({ campaign, initial, accounts, media, onBack, onS
     if (linkDialog.index === null) links.push(parsed.data); else links[linkDialog.index] = parsed.data;
     updateTemplate({ resourceLinks: links }); setLinkDialog(null); setLinkError('');
   }
-  function back() { if (!dirty || window.confirm('Leave this campaign and discard unsaved changes?')) onBack(); }
 
   return <div className="campaign-editor">
     <div className="editor-heading">
-      <IconButton className="back-button" onClick={back} aria-label="Back to campaigns"><Icon icon={ArrowLeft} size={20} /></IconButton>
+      <IconButton className="back-button" onClick={onBack} aria-label="Back to campaigns"><Icon icon={ArrowLeft} size={20} /></IconButton>
       <div className="editor-title">
         <h1>{campaign ? campaign.name : 'New campaign'}</h1>
         <p className="editor-save-state" role="status">{dirty ? campaign ? 'Unsaved changes' : 'Unsaved draft' : campaign ? 'All changes saved' : 'Not saved yet'}</p>

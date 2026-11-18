@@ -892,6 +892,28 @@ code {
   flex-wrap: wrap;
 }
 
+.unsaved-changes-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  color: var(--destructive);
+  background: var(--destructive-surface);
+  margin-bottom: var(--space-4);
+}
+
+.unsaved-changes-dialog h2 {
+  font-size: var(--heading-sm);
+  margin-bottom: var(--space-2);
+}
+
+.unsaved-changes-dialog .dialog-actions {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+
 .toast {
   position: fixed;
   z-index: 100;

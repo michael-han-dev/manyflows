@@ -1,7 +1,8 @@
 import { useId, useRef, type ComponentProps, type ReactNode } from 'react';
 import * as Modal from '@radix-ui/react-dialog';
+import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import * as Switch from '@radix-ui/react-switch';
-import { ArrowTopRightIcon, ArchiveIcon, ChatBubbleIcon, CheckIcon, ChevronDownIcon, Cross2Icon, ReloadIcon } from '@radix-ui/react-icons';
+import { ArrowTopRightIcon, ArchiveIcon, ChatBubbleIcon, CheckIcon, ChevronDownIcon, Cross2Icon, ExclamationTriangleIcon, ReloadIcon } from '@radix-ui/react-icons';
 
 export type AppIcon = typeof ChatBubbleIcon;
 
@@ -45,6 +46,30 @@ export function Toggle({ label, hint, checked, onChange }: { label: string; hint
 export function Dialog({ title, onClose, children, wide = false }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
   const previousFocus = useRef(document.activeElement);
   return <Modal.Root open onOpenChange={open => { if (!open) onClose(); }}><Modal.Portal><Modal.Overlay className="dialog-overlay" /><Modal.Content className={`dialog ${wide ? 'dialog-wide' : ''}`} aria-describedby={undefined} onCloseAutoFocus={event => { event.preventDefault(); if (previousFocus.current instanceof HTMLElement && previousFocus.current.isConnected) previousFocus.current.focus(); }}><div className="dialog-header"><Modal.Title asChild><h2>{title}</h2></Modal.Title><Modal.Close asChild><IconButton aria-label="Close dialog"><Icon icon={Cross2Icon} /></IconButton></Modal.Close></div><div className="dialog-content">{children}</div></Modal.Content></Modal.Portal></Modal.Root>;
+}
+
+export function UnsavedChangesDialog({ onCancel, onDiscard }: { onCancel: () => void; onDiscard: () => void }) {
+  const previousFocus = useRef(document.activeElement);
+  return <AlertDialog.Root open onOpenChange={open => { if (!open) onCancel(); }}>
+    <AlertDialog.Portal>
+      <AlertDialog.Overlay className="dialog-overlay" />
+      <AlertDialog.Content className="dialog unsaved-changes-dialog" onCloseAutoFocus={event => {
+        event.preventDefault();
+        if (previousFocus.current instanceof HTMLElement && previousFocus.current.isConnected) previousFocus.current.focus();
+        else document.getElementById('main-content')?.focus();
+      }}>
+        <div className="dialog-content">
+          <span className="unsaved-changes-icon"><Icon icon={ExclamationTriangleIcon} size={22} /></span>
+          <AlertDialog.Title asChild><h2>Discard unsaved changes?</h2></AlertDialog.Title>
+          <AlertDialog.Description asChild><p>Your latest campaign edits haven't been saved. Leaving now will discard them.</p></AlertDialog.Description>
+          <div className="dialog-actions">
+            <AlertDialog.Cancel asChild><Button>Keep editing</Button></AlertDialog.Cancel>
+            <AlertDialog.Action asChild><Button variant="danger" onClick={onDiscard}>Discard changes</Button></AlertDialog.Action>
+          </div>
+        </div>
+      </AlertDialog.Content>
+    </AlertDialog.Portal>
+  </AlertDialog.Root>;
 }
 
 export const number = (value: number | null | undefined) => value == null ? 'Unavailable' : new Intl.NumberFormat().format(value);
