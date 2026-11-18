@@ -2957,6 +2957,10 @@ code {
   overflow-wrap: anywhere;
 }
 
+.preview-bubble>p {
+  white-space: pre-wrap;
+}
+
 .preview-bubble>button {
   width: 100%;
   border: 0;
@@ -3475,6 +3479,7 @@ code {
   color: var(--muted-foreground);
   line-height: 1.8;
   overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .recorded-message .message-meta {
