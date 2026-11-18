@@ -2030,7 +2030,10 @@ code {
 }
 
 .content-campaign {
-  display: block;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
   font-size: var(--text-sm);
   margin-bottom: var(--space-2);
   max-width: 100%;
@@ -2039,7 +2042,6 @@ code {
 }
 
 .content-campaign .status {
-  margin-top: var(--space-1);
   font-size: var(--text-sm);
 }
 
@@ -3675,8 +3677,9 @@ code {
   line-height: 1.6;
 }
 
+.content-campaign>small,
 .content-campaign>.campaign-target {
-  margin-top: var(--space-1);
+  flex-basis: 100%;
 }
 
 .content-campaign .trigger-label {
