@@ -58,8 +58,8 @@ test('owner creates and publishes a campaign with five reply variants and a work
   await page.locator('.advanced-flow > summary').click();
   const preview = page.getByRole('complementary', { name: 'Campaign preview', exact: true });
   await expect(preview.getByRole('button', { name: 'Send me the guide', exact: true })).toBeVisible();
-  await preview.getByRole('button', { name: 'Send me the guide', exact: true }).click();
   await expect(preview.getByText('Here is your guide. Enjoy!', { exact: true })).toBeVisible();
+  await expect(preview.locator('.preview-response')).toHaveText('Send me the guide');
   await page.getByRole('button', { name: 'Publish campaign', exact: true }).click();
   await expect.poll(async () => {
     const response = await page.request.get('/api/bootstrap');
@@ -147,7 +147,7 @@ test('content details and campaign actions fit without horizontal scrolling', as
   await expect(page.getByRole('textbox', { name: 'Campaign name', exact: true })).toBeVisible();
 });
 
-test('one-page builder preserves optional copy, links and interactive preview state', async ({ page }, testInfo) => {
+test('one-page builder shows the full example flow and preserves optional copy and links', async ({ page }, testInfo) => {
   await signIn(page);
   await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: /^Campaigns/ }).click();
   await page.getByRole('button', { name: 'Create campaign', exact: true }).first().click();
@@ -156,6 +156,7 @@ test('one-page builder preserves optional copy, links and interactive preview st
   await page.getByRole('combobox', { name: 'Campaign account', exact: true }).selectOption('demo-studio');
   await page.getByRole('textbox', { name: 'Opening message', exact: true }).fill('Your opening preview.');
   await page.getByRole('textbox', { name: 'Opening button label', exact: true }).fill('Send resources');
+  const preview = page.getByRole('complementary', { name: 'Campaign preview', exact: true });
   async function switchStep(label: string, checked: boolean) {
     const checkbox = page.getByRole('switch', { name: new RegExp(`^${label}(?: |$)`) });
     if (await checkbox.isChecked() !== checked) await checkbox.locator('..').click();
@@ -169,13 +170,19 @@ test('one-page builder preserves optional copy, links and interactive preview st
   for (const stage of stages) {
     await switchStep(stage.toggle, true);
     await page.getByRole('textbox', { name: stage.field, exact: true }).fill(stage.value);
+    await expect(preview.getByText(stage.value, { exact: true })).toBeVisible();
     await switchStep(stage.toggle, false);
+    await expect(preview.getByText(stage.value, { exact: true })).toHaveCount(0);
+    await expect(preview.getByText('Here is your guide. Enjoy!', { exact: true })).toBeVisible();
     await switchStep(stage.toggle, true);
     await expect(page.getByRole('textbox', { name: stage.field, exact: true })).toHaveValue(stage.value);
+    await expect(preview.getByText(stage.value, { exact: true })).toBeVisible();
   }
   await page.getByRole('spinbutton', { name: 'Reminder minutes', exact: true }).fill('1');
   await switchStep('Opening message', false);
   for (const stage of stages) await expect(page.getByRole('switch', { name: new RegExp(`^${stage.toggle}(?: |$)`) })).not.toBeChecked();
+  await expect(preview.locator('.preview-bubble > p')).toHaveText(['Here is your guide. Enjoy!']);
+  await expect(preview.locator('.preview-response')).toHaveCount(0);
   await switchStep('Opening message', true);
   await expect(page.getByRole('textbox', { name: 'Opening message', exact: true })).toHaveValue('Your opening preview.');
   for (const stage of stages) {
@@ -201,33 +208,44 @@ test('one-page builder preserves optional copy, links and interactive preview st
     await dialog.getByRole('button', { name: 'Save link', exact: true }).click();
   }
   await expect(page.getByRole('button', { name: 'Add link', exact: true })).toBeDisabled();
-  const preview = page.getByRole('complementary', { name: 'Campaign preview', exact: true });
   await switchStep('Private message', false);
   await expect(preview.getByText('Private messages are off for this campaign.', { exact: true })).toBeVisible();
+  await expect(preview.locator('.preview-bubble')).toHaveCount(0);
   await switchStep('Private message', true);
   await preview.getByRole('radio', { name: 'Comments', exact: true }).click();
   await expect(preview.getByText('Example comment', { exact: true })).toBeVisible();
+  await switchStep('Public comment reply', false);
+  await expect(preview.getByText('Public replies are off.', { exact: true })).toBeVisible();
+  await switchStep('Public comment reply', true);
+  await expect(preview.getByText('Public replies are off.', { exact: true })).toHaveCount(0);
   await preview.getByRole('radio', { name: 'Post', exact: true }).click();
   await expect(preview.getByText('Any post or reel', { exact: true })).toBeVisible();
   await preview.getByRole('radio', { name: 'DM', exact: true }).click();
-  for (const visited of [false, true]) {
-    await preview.getByRole('button', { name: 'Start over', exact: true }).click();
-    await preview.getByRole('button', { name: 'Send resources', exact: true }).click();
-    await expect(preview.getByText(stages[1].value, { exact: true })).toHaveCount(0);
-    await preview.getByRole('textbox', { name: 'Preview email', exact: true }).fill('invalid');
-    await preview.getByRole('button', { name: 'Send reply', exact: true }).click();
-    await expect(preview.getByRole('alert')).toHaveText('Enter a valid email.');
-    await preview.getByRole('textbox', { name: 'Preview email', exact: true }).fill('reader@example.com');
-    await preview.getByRole('button', { name: 'Send reply', exact: true }).click();
-    await expect(preview.getByText(stages[1].value, { exact: true })).toBeVisible();
-    await page.getByRole('textbox', { name: 'Resource message', exact: true }).fill('Updated resource preview.');
-    await preview.getByRole('button', { name: 'I followed', exact: true }).click();
-    await expect(preview.getByText('Updated resource preview.', { exact: true })).toBeVisible();
-    await expect(preview.getByText('Remember your links.', { exact: true })).toHaveCount(0);
-    if (visited) await preview.getByRole('button', { name: /^Course.*simulate visit/ }).click();
-    await preview.getByRole('button', { name: 'Advance time', exact: true }).click();
-    await expect(preview.getByText('Remember your links.', { exact: true })).toHaveCount(visited ? 0 : 1);
-  }
+  await expect(preview.locator('.preview-response')).toHaveText(['Send resources', 'alex@example.com', 'I followed']);
+  await expect(preview.locator('.preview-bubble > p')).toHaveText(['Your opening preview.', stages[0].value, stages[1].value, 'Here is your guide. Enjoy!', stages[2].value]);
+  await expect(preview.getByText('After 60 seconds', { exact: true })).toBeVisible();
+  await expect(preview.getByRole('textbox')).toHaveCount(0);
+  await expect(preview.getByRole('button', { name: /^(Send reply|Simulate a reply|Advance time)$/ })).toHaveCount(0);
+  await page.getByRole('textbox', { name: 'Resource message', exact: true }).fill('Updated resource preview.');
+  await expect(preview.getByText('Updated resource preview.', { exact: true })).toBeVisible();
+  await preview.getByRole('button', { name: /^Course.*simulate visit/ }).click();
+  await expect(preview.getByText('Remember your links.', { exact: true })).toHaveCount(0);
+  await expect(preview.getByText('Link visited: yes', { exact: true })).toBeVisible();
+  await preview.getByRole('button', { name: /^Course.*visited/ }).click();
+  await expect(preview.getByText('Remember your links.', { exact: true })).toBeVisible();
+  await expect(preview.getByText('Link visited: no', { exact: true })).toBeVisible();
+  await preview.getByRole('button', { name: /^Course.*simulate visit/ }).click();
+  await page.getByRole('button', { name: 'Edit link 3', exact: true }).click();
+  dialog = page.getByRole('dialog', { name: 'Edit link', exact: true });
+  await dialog.getByRole('textbox', { name: 'Link URL', exact: true }).fill('https://example.com/updated-course');
+  await dialog.getByRole('button', { name: 'Save link', exact: true }).click();
+  await expect(preview.getByText('Remember your links.', { exact: true })).toBeVisible();
+  await expect(preview.getByRole('button', { name: /^Course.*simulate visit/ })).toHaveAttribute('aria-pressed', 'false');
+  await page.getByRole('button', { name: 'Edit link 3', exact: true }).click();
+  dialog = page.getByRole('dialog', { name: 'Edit link', exact: true });
+  await dialog.getByRole('textbox', { name: 'Link URL', exact: true }).fill('https://example.com:8080/course');
+  await dialog.getByRole('button', { name: 'Save link', exact: true }).click();
+  await expect(preview.getByText('Remember your links.', { exact: true })).toBeVisible();
   for (const width of [1440, 1280, 1024, 768, 390, 320]) {
     await page.setViewportSize({ width, height: 900 });
     const bounds = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
@@ -250,7 +268,7 @@ test('one-page builder preserves optional copy, links and interactive preview st
   await expect(page.getByRole('button', { name: 'Add link', exact: true })).toBeDisabled();
 });
 
-test('preview URL visits do not bypass an initial reply or the messaging deadline', async ({ page }) => {
+test('automatic preview shows the opening reply and delay without bypassing the messaging deadline', async ({ page }) => {
   await signIn(page);
   const input = { ...defaultCampaign('demo-studio'), name: `Preview deadline ${randomUUID().slice(0, 8)}`, flow: { entry: 'initial', nodes: [
     { id: 'initial', kind: 'message', text: 'Visit or reply.', buttons: [{ kind: 'url', label: 'Open resource', url: 'https://example.com/' }], next: 'wait' },
@@ -263,10 +281,11 @@ test('preview URL visits do not bypass an initial reply or the messaging deadlin
   await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: /^Campaigns/ }).click();
   await page.getByRole('row').filter({ hasText: input.name }).getByRole('button', { name: 'Edit', exact: true }).click();
   const preview = page.getByRole('complementary', { name: 'Campaign preview', exact: true });
+  await expect(preview.locator('.preview-response')).toHaveText('Example reply');
+  await expect(preview.getByText(`After ${MESSAGING_WINDOW_SECONDS} seconds`, { exact: true })).toBeVisible();
+  await expect(preview.getByText('The messaging window has closed, so the next message cannot be sent.', { exact: true })).toBeVisible();
   await preview.getByRole('button', { name: /^Open resource.*simulate visit/ }).click();
   await expect(preview.getByRole('button', { name: 'Advance time', exact: true })).toHaveCount(0);
-  await preview.getByRole('button', { name: 'Simulate a reply', exact: true }).click();
-  await preview.getByRole('button', { name: 'Advance time', exact: true }).click();
   await expect(preview.getByText('The messaging window has closed, so the next message cannot be sent.', { exact: true })).toBeVisible();
   await expect(preview.getByText('This must not send after expiry.', { exact: true })).toHaveCount(0);
 });
@@ -274,7 +293,7 @@ test('preview URL visits do not bypass an initial reply or the messaging deadlin
 test('preview keeps earlier link-condition results when a later link is visited', async ({ page }) => {
   await signIn(page);
   const input = { ...defaultCampaign('demo-studio'), name: `Preview condition ${randomUUID().slice(0, 8)}`, flow: { entry: 'opening', nodes: [
-    { id: 'opening', kind: 'message', text: 'Choose a response.', buttons: [{ kind: 'reply', label: 'Yes', next: 'check' }, { kind: 'reply', label: 'Absolutely', next: 'check' }], next: null },
+    { id: 'opening', kind: 'message', text: 'Choose a response.', buttons: [{ kind: 'url', label: 'Early link', url: 'https://example.com/early' }, { kind: 'reply', label: 'Yes', next: 'check' }, { kind: 'reply', label: 'Absolutely', next: 'check' }], next: null },
     { id: 'check', kind: 'condition', field: '$link_clicked', operator: 'is_set', value: '', yes: 'done', no: 'resource' },
     { id: 'resource', kind: 'message', text: 'A later resource.', buttons: [{ kind: 'url', label: 'Read', url: 'https://example.com/' }], next: 'done' },
     { id: 'done', kind: 'end', outcome: 'complete' },
@@ -284,13 +303,68 @@ test('preview keeps earlier link-condition results when a later link is visited'
   await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: /^Campaigns/ }).click();
   await page.getByRole('row').filter({ hasText: input.name }).getByRole('button', { name: 'Edit', exact: true }).click();
   const preview = page.getByRole('complementary', { name: 'Campaign preview', exact: true });
+  await expect(preview.locator('.preview-response')).toHaveText('Yes');
+  await expect(preview.getByText('A later resource.', { exact: true })).toBeVisible();
   await preview.getByRole('button', { name: 'Absolutely', exact: true }).click();
+  await expect(preview.locator('.preview-response')).toHaveText('Absolutely');
+  await preview.getByRole('button', { name: /^Early link.*simulate visit/ }).click();
+  await expect(preview.locator('.preview-response')).toHaveText('Absolutely');
+  await expect(preview.getByText('A later resource.', { exact: true })).toHaveCount(0);
+  await expect(preview.getByText('Link visited: yes', { exact: true })).toBeVisible();
+  await preview.getByRole('button', { name: /^Early link.*visited/ }).click();
   await expect(preview.locator('.preview-response')).toHaveText('Absolutely');
   await expect(preview.getByText('Link visited: no', { exact: true })).toBeVisible();
   await preview.getByRole('button', { name: /^Read.*simulate visit/ }).click();
   await expect(preview.getByText('Link visited: no', { exact: true })).toBeVisible();
   await expect(preview.getByText('Link visited: yes', { exact: true })).toHaveCount(0);
 });
+
+test('automatic preview evaluates example fields and tags and allows alternate paths without changing the draft', async ({ page }, testInfo) => {
+  await signIn(page);
+  const input = { ...defaultCampaign('demo-studio'), name: `Example branches ${randomUUID().slice(0, 8)}`, flow: { entry: 'opening', nodes: [
+    { id: 'opening', kind: 'message', text: 'Choose how to continue.', buttons: [{ kind: 'reply', label: 'Continue', next: 'email' }, { kind: 'reply', label: 'Talk to a person', next: 'handoff' }], next: null },
+    { id: 'email', kind: 'collect', field: 'email', prompt: 'Where should we send it?', next: 'name' },
+    { id: 'name', kind: 'collect', field: 'name', prompt: 'What is your name?', next: 'answer' },
+    { id: 'answer', kind: 'collect', field: 'answer', prompt: 'Tell us more.', next: 'tag' },
+    { id: 'tag', kind: 'action', tag: 'Interested', next: 'email-check' },
+    { id: 'email-check', kind: 'condition', field: 'email', operator: 'contains', value: '@EXAMPLE.COM', yes: 'tag-check', no: 'other' },
+    { id: 'tag-check', kind: 'condition', field: 'tags', operator: 'has_tag', value: 'Interested', yes: 'resource', no: 'other' },
+    { id: 'resource', kind: 'message', text: 'Your matching resource.', buttons: [{ kind: 'url', label: 'Read resource', url: 'https://example.com/' }], next: 'link-check' },
+    { id: 'link-check', kind: 'condition', field: '$link_clicked', operator: 'equals', value: 'TRUE', yes: 'clicked', no: 'pending' },
+    { id: 'clicked', kind: 'message', text: 'Thanks for visiting.', buttons: [], next: 'done' },
+    { id: 'pending', kind: 'message', text: 'Your link is ready when you are.', buttons: [], next: 'done' },
+    { id: 'other', kind: 'message', text: 'An alternate resource.', buttons: [], next: 'done' },
+    { id: 'done', kind: 'end', outcome: 'complete' },
+    { id: 'handoff', kind: 'end', outcome: 'handoff' },
+  ] } } satisfies CampaignInput;
+  expect((await page.request.post('/api/campaigns', { data: input })).ok()).toBeTruthy();
+  await page.reload();
+  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: /^Campaigns/ }).click();
+  await page.getByRole('row').filter({ hasText: input.name }).getByRole('button', { name: 'Edit', exact: true }).click();
+  const preview = page.getByRole('complementary', { name: 'Campaign preview', exact: true });
+  await expect(preview.locator('.preview-response')).toHaveText(['Continue', 'alex@example.com', 'Alex', 'Example answer']);
+  await expect(preview.getByText('Your matching resource.', { exact: true })).toBeVisible();
+  await expect(preview.getByText('Your link is ready when you are.', { exact: true })).toBeVisible();
+  await expect(preview.getByText('Link condition: equals TRUE — No', { exact: true })).toBeVisible();
+  await preview.getByRole('group', { name: 'Example result for email', exact: true }).getByRole('button', { name: 'No', exact: true }).click();
+  await expect(preview.getByText('An alternate resource.', { exact: true })).toBeVisible();
+  await expect(preview.getByText('Your matching resource.', { exact: true })).toHaveCount(0);
+  await expect(preview.getByText('Assumed result:', { exact: true })).toBeVisible();
+  await preview.getByRole('button', { name: 'Reset preview', exact: true }).click();
+  await preview.getByRole('button', { name: /^Read resource.*simulate visit/ }).click();
+  await expect(preview.getByText('Thanks for visiting.', { exact: true })).toBeVisible();
+  await expect(preview.getByText('Link condition: equals TRUE — Yes', { exact: true })).toBeVisible();
+  await expect(preview.getByText('Your link is ready when you are.', { exact: true })).toHaveCount(0);
+  await preview.getByRole('button', { name: 'Talk to a person', exact: true }).click();
+  await expect(preview.locator('.preview-response')).toHaveText('Talk to a person');
+  await expect(preview.getByText('Hand off to a person', { exact: true })).toBeVisible();
+  await expect(preview.getByText('Where should we send it?', { exact: true })).toHaveCount(0);
+  await preview.getByRole('button', { name: 'Reset preview', exact: true }).click();
+  await expect(preview.getByText('Your link is ready when you are.', { exact: true })).toBeVisible();
+  await preview.screenshot({ path: testInfo.outputPath('automatic-custom-preview.png'), animations: 'disabled' });
+  expect(campaignsSchema.parse(await (await page.request.get('/api/bootstrap')).json()).campaigns.find(item => item.name === input.name)?.draft).toEqual(input);
+});
+
 
 test('ambiguous saved graphs are not silently converted to guided templates', async ({ page }) => {
   await signIn(page);
@@ -305,6 +379,9 @@ test('ambiguous saved graphs are not silently converted to guided templates', as
   await page.getByRole('row').filter({ hasText: input.name }).getByRole('button', { name: 'Edit', exact: true }).click();
   await expect(page.getByRole('textbox', { name: 'Opening message', exact: true })).toHaveCount(0);
   await expect(page.getByText('Each step needs a unique ID.', { exact: true }).first()).toBeVisible();
+  const preview = page.getByRole('complementary', { name: 'Campaign preview', exact: true });
+  await expect(preview.getByText('The preview stopped because the flow has a missing, repeated, or duplicate step.', { exact: true })).toBeVisible();
+  await expect(preview.getByText('Conversation complete', { exact: true })).toHaveCount(0);
   await page.getByRole('textbox', { name: 'Campaign name', exact: true }).fill(`${input.name} edited`);
   await page.getByRole('button', { name: 'Save draft', exact: true }).click();
   await expect.poll(async () => campaignsSchema.parse(await (await page.request.get('/api/bootstrap')).json()).campaigns.find(item => item.id === saved.id)?.draft)

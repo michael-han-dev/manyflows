@@ -4125,19 +4125,21 @@ code {
   border-radius: var(--radius-sm);
 }
 
-.campaign-preview .preview-bubble form input {
-  width: 100%;
-  margin-top: var(--space-2);
-  font-size: var(--text-sm);
-}
-
 .campaign-preview .preview-bubble small {
   font-size: var(--text-xs);
 }
 
-.campaign-preview .preview-bubble form small {
-  display: block;
-  color: var(--destructive);
+.preview-condition-result {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.preview-condition-result button[aria-pressed=true] {
+  background: var(--muted);
+  color: var(--foreground);
 }
 
 .preview-post {

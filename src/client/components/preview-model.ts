@@ -1,86 +1,117 @@
-import { z } from 'zod';
-import { MESSAGING_WINDOW_SECONDS, type CampaignInput, type FlowNode } from '../../shared/domain';
+import { MESSAGING_WINDOW_SECONDS, type Button, type CampaignInput, type FlowNode } from '../../shared/domain';
 
-export type PreviewEvent =
-  | { kind: 'reply'; nodeId: string; index: number; next: string }
-  | { kind: 'inbound'; nodeId: string; value: string }
-  | { kind: 'visit'; nodeId: string; index: number; url: string }
-  | { kind: 'delay'; nodeId: string; seconds: number }
-  | { kind: 'condition'; nodeId: string; next: string };
+type NodeOf<K extends FlowNode['kind']> = Extract<FlowNode, { kind: K }>;
 
-export type PreviewItem = { node: FlowNode; eventIndex: number; waiting: boolean; linkVisited: boolean };
-export type PreviewResult = { items: PreviewItem[]; eventsUsed: number; visited: boolean; windowClosed: boolean };
+export type PreviewChoice =
+  | { kind: 'reply'; nodeId: string; index: number; button: Extract<Button, { kind: 'reply' }> }
+  | { kind: 'visit'; nodeId: string; index: number; button: Extract<Button, { kind: 'url' }> }
+  | { kind: 'condition'; nodeId: string; condition: NodeOf<'condition'>; matched: boolean };
 
-export function previewCampaign(input: CampaignInput, events: PreviewEvent[]): PreviewResult {
-  const items: PreviewItem[] = [];
-  if (!input.privateReply) return { items, eventsUsed: 0, visited: false, windowClosed: false };
+type PreviewStep =
+  | (NodeOf<'message'> & { response: string | null; replyIndex: number | null; visitedIndex: number | null })
+  | (NodeOf<'collect'> & { answer: string })
+  | (NodeOf<'condition'> & { matched: boolean; assumed: boolean; linkVisited: boolean })
+  | NodeOf<'action' | 'delay' | 'end'>;
+
+type PreviewResult = { steps: PreviewStep[]; validChoices: PreviewChoice[]; stop: 'finished' | 'window-closed' | 'invalid-path' };
+
+const exampleAnswers = { email: 'alex@example.com', name: 'Alex', answer: 'Example answer' } satisfies Record<NodeOf<'collect'>['field'], string>;
+
+export function previewCampaign(input: CampaignInput, choices: readonly PreviewChoice[]): PreviewResult {
+  const steps: PreviewStep[] = [];
+  const nodes = new Map<string, FlowNode | undefined>();
+  for (const node of input.flow.nodes) nodes.set(node.id, nodes.has(node.id) ? undefined : node);
+  const validChoices = choices.filter(choice => {
+    const node = nodes.get(choice.nodeId);
+    if (choice.kind === 'condition') {
+      const saved = choice.condition;
+      return node?.kind === 'condition' && node.field !== '$link_clicked'
+        && node.field === saved.field && node.operator === saved.operator && node.value === saved.value
+        && node.yes === saved.yes && node.no === saved.no;
+    }
+    const button = node?.kind === 'message' ? node.buttons[choice.index] : undefined;
+    if (!button || button.label !== choice.button.label) return false;
+    return choice.kind === 'reply'
+      ? button.kind === 'reply' && button.next === choice.button.next
+      : button.kind === 'url' && button.url === choice.button.url;
+  });
+  if (!input.privateReply) return { steps, validChoices, stop: 'finished' };
+  if (nodes.size !== input.flow.nodes.length) return { steps, validChoices, stop: 'invalid-path' };
   let id: string | null = input.flow.entry;
-  let index = 0;
   let visited = false;
   let elapsed = 0;
   let engaged = false;
-  let windowClosed = false;
+  const fields = new Map<string, string>();
+  const tags = new Set<string>();
   const seen = new Set<string>();
-  while (id && !seen.has(id)) {
-    const node: FlowNode | undefined = input.flow.nodes.find(item => item.id === id);
-    if (!node) break;
+  while (id) {
+    const node = nodes.get(id);
+    if (!node || seen.has(id)) return { steps, validChoices, stop: 'invalid-path' };
     seen.add(id);
-    const eventIndex = index;
-    let waiting = false;
-    let next: string | null = null;
     if ((node.kind === 'message' || node.kind === 'collect') && id !== input.flow.entry && (!engaged || elapsed >= MESSAGING_WINDOW_SECONDS)) {
-      windowClosed = true;
-      break;
+      return { steps, validChoices, stop: 'window-closed' };
     }
     switch (node.kind) {
       case 'message': {
-        const event = events[index];
-        if (event?.kind === 'visit' && event.nodeId === node.id) {
-          const button = node.buttons[event.index];
-          if (button?.kind === 'url' && button.url === event.url) { visited = true; index++; }
+        const reply = validChoices.find(choice => choice.kind === 'reply' && choice.nodeId === node.id);
+        const replyIndex = reply?.kind === 'reply' ? reply.index : node.buttons.findIndex(button => button.kind === 'reply');
+        const button = node.buttons[replyIndex];
+        const visit = validChoices.find(choice => choice.kind === 'visit' && choice.nodeId === node.id);
+        const visitedIndex = visit?.kind === 'visit' ? visit.index : null;
+        if (visitedIndex !== null) visited = true;
+        let response: string | null = null;
+        if (button?.kind === 'reply') {
+          response = button.label;
+          id = button.next;
+        } else {
+          id = node.next;
+          if (node.id === input.flow.entry && id && nodes.get(id)?.kind !== 'end') response = 'Example reply';
         }
-        const replies = node.buttons.filter(button => button.kind === 'reply');
-        const response = events[index];
-        if (replies.length) {
-          const selected = response?.kind === 'reply' ? node.buttons[response.index] : undefined;
-          if (response?.kind === 'reply' && response.nodeId === node.id && selected?.kind === 'reply' && selected.next === response.next) {
-            next = response.next; index++; engaged = true; elapsed = 0;
-          } else waiting = true;
-        } else if (node.id === input.flow.entry && node.next && input.flow.nodes.find(item => item.id === node.next)?.kind !== 'end') {
-          if (response?.kind === 'inbound' && response.nodeId === node.id && response.value.trim()) {
-            next = node.next; index++; engaged = true; elapsed = 0;
-          } else waiting = true;
-        } else next = node.next;
+        if (response !== null) { engaged = true; elapsed = 0; }
+        steps.push({ ...node, response, replyIndex: replyIndex < 0 ? null : replyIndex, visitedIndex });
         break;
       }
       case 'collect': {
-        const event = events[index];
-        if (event?.kind === 'inbound' && event.nodeId === node.id && event.value.trim() && (node.field !== 'email' || z.email().safeParse(event.value.trim()).success)) {
-          next = node.next; index++; engaged = true; elapsed = 0;
-        } else waiting = true;
-        break;
-      }
-      case 'delay': {
-        const event = events[index];
-        if (event?.kind === 'delay' && event.nodeId === node.id && event.seconds === node.seconds) { next = node.next; index++; elapsed += node.seconds; }
-        else waiting = true;
+        const answer = exampleAnswers[node.field];
+        fields.set(node.field, answer);
+        engaged = true;
+        elapsed = 0;
+        steps.push({ ...node, answer });
+        id = node.next;
         break;
       }
       case 'condition': {
-        if (node.field === '$link_clicked' && node.operator === 'is_set') next = visited ? node.yes : node.no;
-        else {
-          const event = events[index];
-          if (event?.kind === 'condition' && event.nodeId === node.id && (event.next === node.yes || event.next === node.no)) { next = event.next; index++; }
-          else waiting = true;
-        }
+        const value = node.field === '$link_clicked' ? visited ? 'true' : '' : fields.get(node.field) ?? '';
+        const choice = validChoices.find(choice => choice.kind === 'condition' && choice.nodeId === node.id);
+        const assumed = choice?.kind === 'condition';
+        const matched = assumed ? choice.matched
+          : node.operator === 'has_tag' ? tags.has(node.value)
+          : node.operator === 'is_set' ? !!value
+          : node.operator === 'equals' ? value.toLocaleLowerCase() === node.value.toLocaleLowerCase()
+          : value.toLocaleLowerCase().includes(node.value.toLocaleLowerCase());
+        steps.push({ ...node, matched, assumed, linkVisited: visited });
+        id = matched ? node.yes : node.no;
         break;
       }
-      case 'action': next = node.next; break;
-      case 'end': break;
+      case 'delay':
+        elapsed += node.seconds;
+        steps.push(node);
+        id = node.next;
+        break;
+      case 'action':
+        tags.add(node.tag);
+        steps.push(node);
+        id = node.next;
+        break;
+      case 'end':
+        steps.push(node);
+        id = null;
+        break;
+      default: {
+        const exhaustive: never = node;
+        return exhaustive;
+      }
     }
-    items.push({ node, eventIndex, waiting, linkVisited: visited });
-    if (waiting) break;
-    id = next;
   }
-  return { items, eventsUsed: index, visited, windowClosed };
+  return { steps, validChoices, stop: 'finished' };
 }
