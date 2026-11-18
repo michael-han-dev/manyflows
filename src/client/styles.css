@@ -1,4 +1,3 @@
-@import url('@xyflow/react/dist/style.css');
 @import url('./theme.css');
 
 :root {
@@ -1252,15 +1251,6 @@ code {
 
 .account-select select {
   padding-left: var(--space-6);
-}
-
-.global-filters .refresh-button {
-  width: var(--control-height);
-  min-width: var(--control-height);
-  height: var(--control-height);
-  min-height: var(--control-height);
-  padding: 0;
-  color: var(--muted-foreground);
 }
 
 .demo-banner {
@@ -3040,292 +3030,6 @@ code {
   font-size: var(--text-sm);
 }
 
-.visual-editor {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--card);
-  overflow: hidden;
-}
-
-.flow-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-4) var(--space-4);
-  border-bottom: 1px solid var(--border);
-  gap: var(--space-4);
-  flex-wrap: wrap;
-}
-
-.flow-toolbar>div:first-child {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.flow-toolbar>div:first-child>svg {
-  color: var(--muted-foreground);
-}
-
-.flow-toolbar strong {
-  font-size: var(--text-md);
-  font-weight: 600;
-  color: var(--foreground);
-  white-space: nowrap;
-}
-
-.flow-toolbar span:not(.select-control) {
-  font-size: var(--text-sm);
-  color: var(--muted-foreground);
-  margin-left: var(--space-1);
-}
-
-.flow-workspace {
-  display: grid;
-  grid-template-columns: minmax(0,1fr) 260px;
-  min-height: 650px;
-}
-
-.flow-canvas {
-  height: 650px;
-  background: var(--background);
-  min-width: 0;
-}
-
-.flow-canvas .react-flow {
-  --xy-background-color: var(--background);
-}
-
-.step-inspector {
-  padding: var(--space-4);
-  border-left: 1px solid var(--border);
-  max-height: 650px;
-  overflow: auto;
-  background: var(--card);
-  min-width: 0;
-}
-
-.inspector-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-4);
-  gap: var(--space-2);
-}
-
-.inspector-title h3 {
-  font-size: var(--text-md);
-  font-weight: 600;
-  color: var(--foreground);
-}
-
-.step-inspector .field {
-  margin-bottom: var(--space-4);
-}
-
-.step-inspector .field>label {
-  font-size: var(--text-sm);
-  color: var(--muted-foreground);
-}
-
-.step-inspector input {
-  font-size: var(--text-md);
-  padding: var(--space-2);
-}
-
-.step-inspector textarea {
-  font-size: var(--text-md);
-  min-height: 33px;
-  padding: var(--space-2);
-}
-
-.step-inspector .section-label {
-  font-size: var(--text-md);
-  color: var(--muted-foreground);
-}
-
-.step-inspector .section-label strong {
-  font-weight: 600;
-}
-
-.inspector-help {
-  border-top: 1px solid var(--border);
-  padding-top: var(--space-4);
-  margin-top: var(--space-5);
-  font-size: var(--text-sm);
-  color: var(--muted-foreground);
-}
-
-.inspector-help svg {
-  float: left;
-  margin: 3px var(--space-1) 0 0;
-}
-
-.button-editor {
-  background: var(--background);
-  border: 1px solid var(--border);
-  margin-bottom: var(--space-4);
-}
-
-.button-editor .select-control {
-  max-width: 145px;
-}
-
-.button-editor>.inline {
-  margin-bottom: var(--space-3);
-}
-
-.button-editor .field:last-child {
-  margin-bottom: 0;
-}
-
-.flow-step {
-  width: 250px;
-  min-height: 160px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--card);
-  box-shadow: 0 3px 6px color-mix(in srgb, var(--shadow-color) 2%, transparent);
-  color: var(--muted-foreground);
-  position: relative;
-  overflow: visible;
-  padding-bottom: var(--space-6);
-}
-
-.flow-step.selected {
-  outline: 2px solid var(--ring);
-  outline-offset: 3px;
-}
-
-.flow-step-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--text-md);
-  border-bottom: 1px solid var(--border);
-  background: var(--background);
-  padding: var(--space-3) var(--space-3);
-  border-radius: 8px 8px 0 0;
-  color: var(--foreground);
-  flex-wrap: wrap;
-}
-
-.flow-step-head strong {
-  font-size: var(--text-md);
-  font-weight: 600;
-  color: var(--foreground);
-}
-
-.flow-step-head>span {
-  margin-left: auto;
-  font-size: var(--text-sm);
-  letter-spacing: .6px;
-  background: var(--muted);
-  padding: 3px var(--space-1);
-  border-radius: 3px;
-  color: var(--foreground);
-}
-
-.flow-step>p {
-  font-size: var(--text-md);
-  line-height: 1.6;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  overflow: hidden;
-  padding: var(--space-3) var(--space-3) 0;
-  max-height: calc(3lh + 13px);
-  color: var(--muted-foreground);
-}
-
-.flow-step>small {
-  font-size: var(--text-sm);
-  margin: var(--space-2) var(--space-3) 0;
-  display: block;
-  color: var(--muted-foreground);
-  overflow-wrap: anywhere;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.flow-port {
-  position: absolute;
-  bottom: 0;
-  transform: translateX(-50%);
-  height: 8px;
-}
-
-.flow-port>span {
-  position: absolute;
-  bottom: 9px;
-  font-size: var(--text-sm);
-  white-space: nowrap;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--card);
-  padding: 1px 3px;
-  color: var(--muted-foreground);
-  max-width: calc(100% - 8px);
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.flow-step .react-flow__handle {
-  height: 7px;
-  width: 7px;
-  background: var(--accent);
-  border: 2px solid var(--border);
-  min-height: 7px;
-  min-width: 7px;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--shadow-color) 100%, transparent);
-}
-
-.flow-step.flow-condition .flow-step-head {
-  background: var(--warning-surface);
-  color: var(--chart-2);
-}
-
-.flow-step.flow-collect .flow-step-head {
-  background: var(--background);
-  color: var(--foreground);
-}
-
-.flow-step.flow-delay .flow-step-head {
-  background: var(--warning-surface);
-  color: var(--chart-2);
-}
-
-.flow-step.flow-end .flow-step-head {
-  background: var(--background);
-  color: var(--foreground);
-}
-
-.react-flow__edge-text {
-  font-size: var(--text-sm);
-  fill: var(--muted-foreground);
-}
-
-.react-flow__edge-textbg {
-  fill: var(--background);
-}
-
-.react-flow__controls {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  box-shadow: 0 2px 5px color-mix(in srgb, var(--shadow-color) 2%, transparent);
-  overflow: hidden;
-}
-
-.react-flow__controls button {
-  background: var(--card);
-  color: var(--foreground);
-  border-bottom: 1px solid var(--border);
-  width: 27px;
-  height: 26px;
-  padding: var(--space-2);
-}
-
 .demo-intro {
   display: flex;
   align-items: center;
@@ -3949,10 +3653,6 @@ code {
   line-height: 1.6;
 }
 
-.published-target {
-  margin-bottom: var(--space-4);
-}
-
 .content-campaign>.campaign-target {
   margin-top: var(--space-1);
 }
@@ -3974,10 +3674,6 @@ code {
   color: var(--accent-foreground);
 }
 
-.react-flow__controls button svg {
-  fill: currentColor;
-}
-
 .illustration-check {
   color: var(--primary-foreground);
   background: var(--primary);
@@ -3995,24 +3691,12 @@ code {
   min-width: 0;
 }
 
-.flow-toolbar>div {
-  min-width: 0;
-}
-
 .card-heading .button {
-  white-space: normal;
-}
-
-.flow-toolbar .button {
   white-space: normal;
 }
 
 .dialog-actions .button {
   white-space: normal;
-}
-
-.flow-toolbar>.inline {
-  flex-wrap: wrap;
 }
 
 .campaign-builder {
@@ -4218,45 +3902,6 @@ code {
   color: var(--destructive);
 }
 
-.advanced-flow {
-  padding: var(--space-4);
-  margin-bottom: var(--space-4);
-}
-
-.advanced-flow summary {
-  cursor: pointer;
-  font-weight: 600;
-}
-
-.advanced-flow summary span {
-  color: var(--muted-foreground);
-  font-size: var(--text-sm);
-  font-weight: 400;
-  margin-left: var(--space-2);
-}
-
-.advanced-flow>.field-hint {
-  margin-bottom: var(--space-3);
-}
-
-.advanced-flow .flow-workspace {
-  grid-template-columns: minmax(0,1fr);
-}
-
-.advanced-flow .step-inspector {
-  max-height: 500px;
-  overflow: auto;
-}
-
-.advanced-flow .flow-toolbar {
-  flex-wrap: wrap;
-}
-
-.advanced-flow .flow-canvas {
-  height: 430px;
-  min-height: 0;
-}
-
 .preview-response {
   margin: 0 0 var(--space-4) auto;
   padding: var(--space-2) var(--space-3);
@@ -4352,13 +3997,6 @@ button,a,input,select,textarea,summary {
 @keyframes dialog-enter {
   from { opacity: 0; transform: translate(-50%, calc(-50% + 8px)); }
   to { opacity: 1; transform: translate(-50%, -50%); }
-}
-
-.editor-title-row{
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
 }
 
 .editor-state{
@@ -4664,14 +4302,6 @@ button,a,input,select,textarea,summary {
     display: none;
   }
 
-  .flow-workspace {
-    grid-template-columns: minmax(0,1fr) 235px;
-  }
-
-  .flow-toolbar>div:first-child>span {
-    display: none;
-  }
-
   .inbox-layout {
     grid-template-columns: 255px 1fr;
   }
@@ -4931,36 +4561,6 @@ button,a,input,select,textarea,summary {
     margin-left: var(--space-6);
   }
 
-  .flow-workspace {
-    grid-template-columns: minmax(0,1fr) 220px;
-    min-height: 620px;
-  }
-
-  .flow-canvas {
-    height: 620px;
-  }
-
-  .step-inspector {
-    max-height: 620px;
-    padding: var(--space-4);
-  }
-
-  .flow-toolbar {
-    padding: var(--space-3) var(--space-4);
-  }
-
-  .flow-toolbar>div:first-child strong {
-    font-size: var(--text-md);
-  }
-
-  .flow-toolbar .select-control {
-    max-width: 120px;
-  }
-
-  .flow-toolbar select {
-    font-size: var(--text-sm);
-  }
-
   .inbox-layout {
     grid-template-columns: 215px 1fr;
   }
@@ -5198,64 +4798,6 @@ button,a,input,select,textarea,summary {
 
   .editor-title h1 {
     font-size: var(--heading-md);
-  }
-
-  .flow-workspace {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .flow-canvas {
-    height: 480px;
-  }
-
-  .step-inspector {
-    border-left: 0;
-    border-top: 1px solid var(--border);
-    max-height: 500px;
-    padding: var(--space-5);
-  }
-
-  .step-inspector .field>label {
-    font-size: var(--text-md);
-  }
-
-  .step-inspector input {
-    font-size: var(--text-md);
-  }
-
-  .step-inspector textarea {
-    font-size: var(--text-md);
-  }
-
-  .step-inspector select {
-    font-size: var(--text-md);
-  }
-
-  .step-inspector .button-editor {
-    max-width: 350px;
-  }
-
-  .flow-toolbar {
-    gap: var(--space-2);
-    flex-wrap: wrap;
-  }
-
-  .flow-toolbar>div:first-child {
-    width: 100%;
-    margin-bottom: var(--space-1);
-  }
-
-  .flow-toolbar .select-control {
-    max-width: 190px;
-  }
-
-  .flow-toolbar>.inline {
-    width: 100%;
-  }
-
-  .flow-toolbar>.inline>.select-control {
-    flex: 1;
   }
 
   .inbox-layout {
@@ -5556,11 +5098,6 @@ button,a,input,select,textarea,summary {
     font-size: var(--text-sm);
   }
 
-  .global-filters .refresh-button {
-    grid-column: auto;
-    justify-self: end;
-  }
-
   .topbar .breadcrumb>strong {
     display: inline;
     font-size: var(--text-md);
@@ -5580,7 +5117,7 @@ button,a,input,select,textarea,summary {
     gap: var(--space-2);
     flex: 1;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) var(--control-height);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 0;
   }
 
@@ -6373,44 +5910,6 @@ button,a,input,select,textarea,summary {
     font-size: var(--text-md);
   }
 
-  .flow-toolbar {
-    padding: var(--space-4);
-  }
-
-  .flow-workspace {
-    min-height: 0;
-  }
-
-  .flow-canvas {
-    height: 440px;
-  }
-
-  .step-inspector {
-    padding: var(--space-4);
-    max-height: 540px;
-  }
-
-  .step-inspector .field>label {
-    font-size: var(--text-md);
-  }
-
-  .step-inspector input {
-    font-size: var(--text-md);
-  }
-
-  .step-inspector textarea {
-    font-size: var(--text-md);
-    min-height: 35px;
-  }
-
-  .step-inspector select {
-    font-size: var(--text-md);
-  }
-
-  .step-inspector .button-editor {
-    max-width: none;
-  }
-
   .flow-validation {
     font-size: var(--text-md);
     padding: var(--space-4);
@@ -6801,7 +6300,7 @@ button,a,input,select,textarea,summary {
 
   .global-filters {
     gap: var(--space-2);
-    grid-template-columns: minmax(0, 1fr) var(--control-height);
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .global-filters .select-control {
@@ -6922,24 +6421,9 @@ button,a,input,select,textarea,summary {
     min-width: var(--control-height);
   }
 
-  .global-filters .account-select{
-    grid-column: 1 / -1;
-    width: 100%;
-  }
-
   .global-filters .account-select .select-control{
     max-width: 100%;
     width: 100%;
-  }
-
-  .global-filters>.select-control{
-    grid-column: 1;
-    grid-row: 2;
-  }
-
-  .global-filters .refresh-button{
-    grid-column: 2;
-    grid-row: 2;
   }
 }
 
@@ -6985,10 +6469,6 @@ button,a,input,select,textarea,summary {
 
   .campaign-preview .phone-top {
     padding: var(--space-3);
-  }
-
-  .advanced-flow {
-    padding: var(--space-4);
   }
 }
 

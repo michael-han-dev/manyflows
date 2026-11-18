@@ -79,23 +79,3 @@ export function writeTemplate(model: TemplateModel): Flow {
 }
 
 export function starterFlow(): Flow { return defaultCampaign('').flow; }
-
-export function newStep(kind: FlowNode['kind'], id: string, destination: string): FlowNode {
-  switch (kind) {
-    case 'message': return { id, kind, text: 'Your message', buttons: [], next: destination };
-    case 'collect': return { id, kind, field: 'email', prompt: 'What is your email address?', next: destination };
-    case 'condition': return { id, kind, field: 'email', operator: 'is_set', value: '', yes: destination, no: destination };
-    case 'action': return { id, kind, tag: 'interested', next: destination };
-    case 'delay': return { id, kind, seconds: DEFAULT_REMINDER_SECONDS, next: destination };
-    case 'end': return { id, kind, outcome: 'complete' };
-  }
-}
-
-export function redirectStep(node: FlowNode, from: string, to: string | null): FlowNode {
-  switch (node.kind) {
-    case 'message': return { ...node, next: node.next === from ? to : node.next, buttons: node.buttons.filter(button => button.kind !== 'reply' || button.next !== from || to !== null).map(button => button.kind === 'reply' && button.next === from && to ? { ...button, next: to } : button) };
-    case 'condition': return { ...node, yes: node.yes === from ? to ?? '' : node.yes, no: node.no === from ? to ?? '' : node.no };
-    case 'collect': case 'action': case 'delay': return { ...node, next: node.next === from ? to ?? '' : node.next };
-    case 'end': return node;
-  }
-}

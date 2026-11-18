@@ -52,15 +52,23 @@ test('owner creates and publishes a campaign with five reply variants and a work
   const linkDialog = page.getByRole('dialog', { name: 'Edit link', exact: true });
   await linkDialog.getByRole('textbox', { name: 'Link URL', exact: true }).fill('https://www.notion.so/browser-guide');
   await linkDialog.getByRole('button', { name: 'Save link', exact: true }).click();
-  await page.locator('.advanced-flow > summary').click();
-  await expect(page.getByText('Conversation canvas', { exact: true })).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath('flow-editor.png'), fullPage: true, animations: 'disabled' });
-  await page.locator('.advanced-flow > summary').click();
+  await expect(page.getByText(/^Advanced flow/)).toHaveCount(0);
+  await expect(page.getByLabel('Visual conversation flow', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Refresh workspace', exact: true })).toHaveCount(0);
   const preview = page.getByRole('complementary', { name: 'Campaign preview', exact: true });
   await expect(preview.getByRole('button', { name: 'Send me the guide', exact: true })).toBeVisible();
   await expect(preview.getByText('Here is your guide. Enjoy!', { exact: true })).toBeVisible();
   await expect(preview.locator('.preview-response')).toHaveText('Send me the guide');
-  await page.getByRole('button', { name: 'Publish campaign', exact: true }).click();
+  const actions = page.getByRole('group', { name: 'Campaign actions', exact: true });
+  const status = actions.getByRole('status');
+  await expect(status).toHaveText('Draft');
+  await actions.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await expect(page.getByText('All changes saved', { exact: true })).toBeVisible();
+  await expect(status).toHaveText('Draft');
+  await actions.getByRole('button', { name: 'Publish campaign', exact: true }).click();
+  await expect(status).toHaveText('Published');
+  await expect(page.getByText(/^Published target:/)).toHaveCount(0);
+  await expect(page.getByText('Published. New conversations will use this version.', { exact: true })).toHaveCount(0);
   await expect.poll(async () => {
     const response = await page.request.get('/api/bootstrap');
     const current = campaignsSchema.parse(await response.json()).campaigns.find(item => item.name === name);
@@ -88,6 +96,10 @@ test('owner creates and publishes a campaign with five reply variants and a work
   await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: /^Campaigns/ }).click();
   await expect(page.getByText(name, { exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('campaigns-desktop.png'), fullPage: true, animations: 'disabled' });
+  await page.getByRole('row').filter({ hasText: name }).getByRole('button', { name: 'Edit', exact: true }).click();
+  await actions.getByRole('button', { name: 'Pause', exact: true }).click();
+  await expect(status).toHaveText('Paused');
+  await expect(actions.getByRole('button', { name: 'Publish campaign', exact: true })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -445,6 +457,43 @@ test('a live campaign keeps its published target visible after editing the draft
   expect(data.campaigns.find(item => item.id === fixture.id)?.publishedTarget?.kind).toBe('all');
 });
 
+test('duplicating a live campaign opens a separate draft with its last saved settings', async ({ page }) => {
+  await signIn(page);
+  const fixture = await publishFixture(page);
+  await page.reload();
+  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: /^Campaigns/ }).click();
+  await page.getByRole('row').filter({ hasText: fixture.input.name }).getByRole('button', { name: 'Edit', exact: true }).click();
+
+  const actions = page.getByRole('group', { name: 'Campaign actions', exact: true });
+  const keywords = page.getByRole('textbox', { name: 'Include keywords', exact: true });
+  const savedKeyword = `saved-${fixture.keyword}`;
+  await keywords.fill(savedKeyword);
+  await actions.getByRole('button', { name: 'Save draft', exact: true }).click();
+  await expect(page.getByText('All changes saved', { exact: true })).toBeVisible();
+  await expect(actions.getByRole('status')).toHaveText('Published');
+  await keywords.fill('unsaved keyword');
+  await expect(page.getByText('Unsaved changes', { exact: true })).toBeVisible();
+  await expect(actions.getByRole('status')).toHaveText('Published');
+
+  await actions.getByRole('button', { name: 'Duplicate', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Duplicate campaign', exact: true });
+  await expect(dialog.getByText(/last saved settings/)).toBeVisible();
+  await expect(dialog.getByText(/discard your unsaved edits/)).toBeVisible();
+  await dialog.getByRole('button', { name: 'Duplicate', exact: true }).click();
+
+  const copyName = `${fixture.input.name} (copy)`;
+  await expect(page.getByRole('heading', { name: copyName, exact: true })).toBeVisible();
+  await expect(actions.getByRole('status')).toHaveText('Draft');
+  await expect(keywords).toHaveValue(savedKeyword);
+  const { campaigns } = campaignsSchema.parse(await (await page.request.get('/api/bootstrap')).json());
+  const copy = campaigns.find(item => item.name === copyName);
+  expect(copy).toMatchObject({ status: 'draft', publishedTarget: null });
+  expect(copy?.id).not.toBe(fixture.id);
+  expect(campaigns.find(item => item.id === fixture.id)).toMatchObject({
+    status: 'live', publishedTarget: fixture.input.target, draft: { matching: { include: [savedKeyword] } },
+  });
+});
+
 test('contact CSV neutralizes a collected spreadsheet formula', async ({ page }) => {
   await signIn(page);
   const flow: CampaignInput['flow'] = { entry: 'opening', nodes: [
@@ -594,9 +643,11 @@ test('all workspace layouts remain usable across phone, tablet and desktop width
     if (width <= 390) {
       const account = await page.getByLabel('Account filter', { exact: true }).boundingBox();
       const range = await page.getByLabel('Date range', { exact: true }).boundingBox();
-      const refresh = await page.getByRole('button', { name: 'Refresh workspace', exact: true }).boundingBox();
-      expect(account).not.toBeNull(); expect(range).not.toBeNull(); expect(refresh).not.toBeNull();
-      if (account && range && refresh) { if (width > 380) expect(Math.abs(account.y - range.y)).toBeLessThanOrEqual(1); else expect(range.y).toBeGreaterThan(account.y); expect(Math.abs(range.y + range.height / 2 - refresh.y - refresh.height / 2)).toBeLessThanOrEqual(1); }
+      expect(account).not.toBeNull(); expect(range).not.toBeNull();
+      if (account && range) {
+        if (width > 380) expect(Math.abs(account.y - range.y)).toBeLessThanOrEqual(1);
+        else expect(range.y).toBeGreaterThan(account.y);
+      }
     }
   }
 });
@@ -623,12 +674,12 @@ test('preview includes post context and workspace controls have consistent spaci
       const workspace = document.querySelector('.workspace-label');
       const header = document.querySelector('.editor-title');
       const workspaceText = workspace?.querySelector('strong');
-      const controls = ['[aria-label="Account filter"]', '[aria-label="Date range"]', '[aria-label="Refresh workspace"]', '[aria-label="Campaign account"]'].map(selector => {
+      const controls = ['[aria-label="Account filter"]', '[aria-label="Date range"]', '[aria-label="Campaign account"]'].map(selector => {
         const element = document.querySelector(selector);
         if (!element) throw new Error('Missing workspace control');
         const style = getComputedStyle(element);
         const arrow = element.closest('.select-control')?.querySelector('svg');
-        return { label: element.getAttribute('aria-label'), height: element.getBoundingClientRect().height, appearance: style.appearance, paddingRight: parseFloat(style.paddingRight), arrowInset: arrow ? element.getBoundingClientRect().right - arrow.getBoundingClientRect().right : null };
+        return { height: element.getBoundingClientRect().height, appearance: style.appearance, paddingRight: parseFloat(style.paddingRight), arrowInset: arrow ? element.getBoundingClientRect().right - arrow.getBoundingClientRect().right : null };
       });
       return { workspaceText: workspace?.textContent, workspaceIcons: workspace?.querySelectorAll('svg').length, headerMarkers: header?.querySelectorAll('.status i,.save-indicator').length, workspaceLineHeight: workspaceText?.getBoundingClientRect().height, workspaceTextLineHeight: workspaceText ? parseFloat(getComputedStyle(workspaceText).lineHeight) : null, controls };
     });
@@ -636,8 +687,8 @@ test('preview includes post context and workspace controls have consistent spaci
     expect.soft(measurements.workspaceIcons).toBe(0);
     if (measurements.workspaceLineHeight && measurements.workspaceTextLineHeight) expect.soft(measurements.workspaceLineHeight).toBeLessThanOrEqual(measurements.workspaceTextLineHeight + 1);
     expect.soft(measurements.headerMarkers).toBe(0);
-    expect.soft(new Set(measurements.controls.map(control => control.height)).size, 'Account, date, refresh and form controls must share one height').toBe(1);
-    for (const select of measurements.controls.filter(control => control.label !== 'Refresh workspace')) {
+    expect.soft(new Set(measurements.controls.map(control => control.height)).size, 'Account, date and form controls must share one height').toBe(1);
+    for (const select of measurements.controls) {
       expect.soft(select.appearance, 'Dropdown arrows need app-owned edge spacing').toBe('none');
       expect.soft(select.paddingRight).toBeGreaterThanOrEqual(32);
       expect.soft(select.arrowInset).toBeGreaterThanOrEqual(8);
@@ -662,7 +713,7 @@ test('touch screens keep dropdowns, inputs and action buttons aligned', async ({
     await touch.goto('/');
     await touch.getByRole('button', { name: 'Create campaign', exact: true }).first().click();
     expect(await touch.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBeTruthy();
-    const sizes = await touch.evaluate(() => ['[aria-label="Account filter"]', '[aria-label="Date range"]', '[aria-label="Refresh workspace"]', '[aria-label="Campaign account"]', '[aria-label="Campaign name"]', '.editor-actions .button'].map(selector => {
+    const sizes = await touch.evaluate(() => ['[aria-label="Account filter"]', '[aria-label="Date range"]', '[aria-label="Campaign account"]', '[aria-label="Campaign name"]', '.editor-actions .button'].map(selector => {
       const element = document.querySelector(selector);
       if (!element) throw new Error('Missing touch control');
       return element.getBoundingClientRect().height;
