@@ -177,11 +177,11 @@ async function executeAction(env: Env, item: ActionRow, journey: RunRow, person:
   if (expires <= time) { await env.DB.batch([statement(env, "UPDATE runs SET state='expired',updated_at=? WHERE id=?", time, journey.id), statement(env, "UPDATE actions SET status='failed',error='Messaging window expired.',updated_at=? WHERE id=?", time, item.id)]); return 'stop'; }
   const account = await one<AccountRow>(env, `${accountSelect} WHERE id=?`, journey.account_id); if (!account) throw new Error('Missing account');
   const demoPacing = demoAllowed(env) && account.mode === 'demo' ? await one<{ value: string }>(env, 'SELECT value FROM settings WHERE key=?', `pacing:${account.id}`) : null;
-  const pacing = demoAllowed(env) && account.mode === 'demo' ? Number(demoPacing?.value ?? 0) : 5000;
+  const pacing = demoAllowed(env) && account.mode === 'demo' ? Number(demoPacing?.value ?? 0) : 1000;
   const slot = await statement(env, 'UPDATE accounts SET next_send_at=? WHERE id=? AND next_send_at<=? RETURNING id', time + pacing, account.id, time).first();
   if (!slot) {
     const pending = await one<{ next_send_at: number }>(env, `${accountSelect} WHERE id=?`, account.id);
-    await run(env, 'UPDATE runs SET wake_at=? WHERE id=?', pending?.next_send_at ?? time + 5000, journey.id);
+    await run(env, 'UPDATE runs SET wake_at=? WHERE id=?', pending?.next_send_at ?? time + pacing, journey.id);
     return 'wait';
   }
   const payload = await preparePayload(env, item, journey, person);

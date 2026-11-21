@@ -76,13 +76,23 @@ test('shared business grant reconciles discovery, failures, expiry and revocatio
   expect(campaignResponse.status()).toBe(201);
   const campaign = z.object({ id: z.string() }).parse(await campaignResponse.json());
   expect((await request.post(`/api/campaigns/${campaign.id}/publish`)).ok()).toBeTruthy();
+  const commentAt = Date.now();
+  const tick = async (now: number) => {
+    expect((await request.post('/api/demo/tick', { data: { now } })).ok()).toBeTruthy();
+  };
+  await tick(commentAt);
   const webhook = JSON.stringify({ object: 'instagram', entry: [{ id: 'example_ig_1', changes: [{ field: 'comments', value: { id: 'example_comment', from: { id: 'example_sender', username: 'example_reader' }, media: { id: 'example_media' }, text: 'GUIDE' } }] }] });
   const signature = createHmac('sha256', 'e2e-meta-secret').update(webhook).digest('hex');
   expect((await request.post('/webhooks/instagram', { data: webhook, headers: { 'content-type': 'application/json', 'x-hub-signature-256': `sha256=${signature}` } })).ok()).toBeTruthy();
-  await expect.poll(async () => {
-    const result = z.object({ messages: z.array(z.object({ accountId: z.string(), direction: z.string(), status: z.string() })) }).parse(await (await request.get('/api/bootstrap')).json());
-    return result.messages.filter(message => message.accountId === 'example_ig_1' && message.direction === 'out' && message.status === 'accepted').length;
-  }).toBe(2);
+  const sentChannels = async () => {
+    const result = z.object({ messages: z.array(z.object({ accountId: z.string(), direction: z.string(), status: z.string(), channel: z.string() })) }).parse(await (await request.get('/api/bootstrap')).json());
+    return result.messages.filter(message => message.accountId === 'example_ig_1' && message.direction === 'out' && message.status === 'accepted').map(message => message.channel).sort();
+  };
+  await expect.poll(sentChannels).toEqual(['public']);
+  await tick(commentAt + 999);
+  expect(await sentChannels()).toEqual(['public']);
+  await tick(commentAt + 1000);
+  await expect.poll(sentChannels).toEqual(['dm', 'public']);
   const stored = database("SELECT id, token, expires_at FROM meta_grants WHERE client_business_id='example_business'");
   const grants = z.array(z.object({ id: z.string(), token: z.string(), expires_at: z.number().nullable() })).parse(JSON.parse(stored));
   expect(grants).toHaveLength(1);
