@@ -14,7 +14,7 @@
   "d1_databases": [{ "binding": "DB", "database_name": "comment-on-video", "database_id": "00000000-0000-0000-0000-000000000000", "migrations_dir": "migrations" }],
   "queues": {
     "producers": [{ "binding": "OUTBOX", "queue": "comment-on-video-outbox" }],
-    "consumers": [{ "queue": "comment-on-video-outbox", "max_batch_size": 10, "max_batch_timeout": 2, "max_retries": 3, "max_concurrency": 1, "dead_letter_queue": "comment-on-video-dead-letter" }]
+    "consumers": [{ "queue": "comment-on-video-outbox", "max_batch_size": 10, "max_batch_timeout": 0, "max_retries": 3, "max_concurrency": 1, "dead_letter_queue": "comment-on-video-dead-letter" }]
   },
   "triggers": { "crons": ["* * * * *"] },
   "vars": { "GRAPH_VERSION": "v27.0", "DEMO_MODE": "false", "PUBLIC_BASE_URL": "http://localhost:8787", "META_INSIGHTS_ENABLED": "false" }

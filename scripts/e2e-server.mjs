@@ -13,7 +13,7 @@ writeFileSync(configPath, JSON.stringify({
   compatibility_flags: ['nodejs_compat'],
   assets: { directory: resolve('dist'), binding: 'ASSETS', not_found_handling: 'single-page-application', run_worker_first: ['/api/*', '/webhooks/*', '/auth/*', '/r/*'] },
   d1_databases: [{ binding: 'DB', database_name: 'relay-e2e', database_id: '00000000-0000-0000-0000-000000000001', migrations_dir: resolve('migrations') }],
-  queues: { producers: [{ binding: 'OUTBOX', queue: 'relay-e2e-jobs' }], consumers: [{ queue: 'relay-e2e-jobs', max_batch_size: 10, max_retries: 3 }] },
+  queues: { producers: [{ binding: 'OUTBOX', queue: 'relay-e2e-jobs' }], consumers: [{ queue: 'relay-e2e-jobs', max_batch_size: 10, max_batch_timeout: 0, max_retries: 3 }] },
   vars: {
     ADMIN_PASSWORD: 'e2e-local-password',
     SESSION_SECRET: 'e2e-session-secret-at-least-32-characters',
