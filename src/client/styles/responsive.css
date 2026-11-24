@@ -1454,7 +1454,7 @@
     left: 50%;
     transform: translate(-50%, -50%);
     margin: 0;
-    z-index: 101;
+    z-index: var(--dialog-layer);
     box-shadow: var(--elevation-overlay);
     animation: dialog-enter var(--motion-normal) var(--ease-out);
   }

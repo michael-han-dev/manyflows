@@ -43,7 +43,11 @@ test('message line breaks survive the preview and automation conversation', asyn
   await expect.poll(async () => snapshotSchema.parse(await (await page.request.get('/api/bootstrap')).json()).campaigns.find(item => item.name === name)?.status).toBe('live');
   await page.getByRole('button', { name: 'Open demo studio', exact: true }).click();
   const studio = page.getByRole('dialog', { name: 'Demo studio', exact: true });
-  await chooseOption(page, 'Demo account', '@northstar.studio');
+  await studio.getByRole('combobox', { name: 'Demo account' }).click();
+  const menu = page.getByRole('listbox', { name: 'Demo account' });
+  const dialogLayer = await studio.evaluate(element => Number(getComputedStyle(element).zIndex));
+  expect(await menu.evaluate(element => Number(getComputedStyle(element).zIndex))).toBeGreaterThan(dialogLayer);
+  await menu.getByRole('option', { name: '@northstar.studio', exact: true }).click();
   await chooseOption(page, 'Demo media', /^Three simple ideas for your next creative project/);
   await studio.getByLabel('Demo username', { exact: true }).fill(`lines-${keyword}`);
   await studio.getByLabel('Demo comment', { exact: true }).fill(keyword);

@@ -707,7 +707,7 @@ code {
   left: 50%;
   transform: translate(-50%, -50%);
   margin: 0;
-  z-index: 101;
+  z-index: var(--dialog-layer);
   animation: dialog-enter var(--motion-normal) var(--ease-out);
 }
 
@@ -773,7 +773,7 @@ code {
 
 .toast {
   position: fixed;
-  z-index: 100;
+  z-index: var(--overlay-layer);
   left: calc(50% + 100px);
   bottom: 30px;
   transform: translateX(-50%);
