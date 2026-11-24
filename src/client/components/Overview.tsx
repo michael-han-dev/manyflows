@@ -5,28 +5,37 @@ import { username } from './account-name';
 import { PageHeading } from './PageHeading';
 import './overview.css';
 
-const campaignMetrics = ['Started', 'Completed', 'Waiting', 'Completion'] as const;
+const campaignMetrics = ['Started', 'Finished', 'Waiting', 'Finish rate'] as const;
 const featuredCampaignLimit = 5;
+
+function countWithUnit(value: number, unit: string) {
+  return `${number(value)} ${unit}${value === 1 ? '' : 's'}`;
+}
 
 export function Overview({ data, accountId, onCreate, onCampaigns, onActivity, onDemo }: { data: Bootstrap; accountId: string; onCreate: () => void; onCampaigns: () => void; onActivity: () => void; onDemo: () => void }) {
   const { metrics, accounts, campaigns, media, runs } = data;
   const liveCampaigns = campaigns.filter(campaign => campaign.status === 'live');
   const featuredCampaigns = [...liveCampaigns, ...campaigns.filter(campaign => campaign.status !== 'live')].slice(0, featuredCampaignLimit);
   const funnel = [
-    { label: 'Matched comments', count: metrics.matchedComments, note: 'Campaign entries' },
-    { label: 'Opening messages', count: metrics.openingAccepted, note: 'API accepted' },
-    { label: 'Button responses', count: metrics.buttonResponders, note: 'Unique responding contacts' },
-    { label: 'Resource messages', count: metrics.linkMessagesAccepted, note: 'API accepted' },
-    { label: 'Link visits', count: metrics.uniqueClickers, note: 'Unique attributed contacts' },
+    { label: 'Comments matched', count: metrics.matchedComments, note: 'Campaigns triggered by a comment' },
+    { label: 'Opening DMs', count: metrics.openingAccepted, note: 'Private replies accepted by Instagram' },
+    { label: 'Button responders', count: metrics.buttonResponders, note: 'Contacts who tapped a reply button' },
+    { label: 'Messages with links', count: metrics.linkMessagesAccepted, note: 'Accepted messages with a link button' },
+    { label: 'Link visitors', count: metrics.uniqueClickers, note: 'Contacts credited with a link visit' },
   ];
   const largestStage = Math.max(1, ...funnel.map(stage => stage.count));
   const reportableReach = media.flatMap(item => item.reach === null ? [] : [item.reach]);
   const totalReach = reportableReach.length ? reportableReach.reduce((sum, reach) => sum + reach, 0) : null;
   const highlights = [
-    { label: 'Matched comments', value: number(metrics.matchedComments), note: 'Comments entering a flow' },
-    { label: 'Opening messages', value: number(metrics.openingAccepted), note: 'API accepted · delivery unavailable' },
-    { label: 'Emails collected', value: number(metrics.emailsCollected), note: 'Valid email addresses captured' },
-    { label: 'Link click-through', value: rate(metrics.uniqueClickers, metrics.linkMessagesAccepted), note: `${number(metrics.uniqueClickers)} attributed clickers / ${number(metrics.linkMessagesAccepted)} link messages` },
+    { label: 'Conversations started', value: metrics.matchedComments, note: 'A comment triggered a campaign.' },
+    { label: 'Opening DMs', value: metrics.openingAccepted, note: 'Instagram accepted the private reply.' },
+    { label: 'Email contacts', value: metrics.emailsCollected, note: 'Each contact who shared an email counts once.' },
+    { label: 'Link visitors', value: metrics.uniqueClickers, note: 'Each contact credited with a link visit counts once.' },
+  ];
+  const rates = [
+    { label: 'Button response rate', numerator: metrics.buttonResponders, numeratorLabel: 'responding contact', denominator: metrics.openingAccepted, denominatorLabel: 'accepted opening DM' },
+    { label: 'Link click-through', numerator: metrics.uniqueClickers, numeratorLabel: 'attributed visitor', denominator: metrics.linkMessagesAccepted, denominatorLabel: 'accepted link message' },
+    { label: 'Conversation completion', numerator: metrics.completedRuns, numeratorLabel: 'finished conversation', denominator: runs.length, denominatorLabel: 'started conversation' },
   ];
 
   return <div className="workspace-overview">
@@ -54,9 +63,9 @@ export function Overview({ data, accountId, onCreate, onCampaigns, onActivity, o
           const waiting = campaignRuns.filter(run => run.state === 'waiting' || run.state === 'delayed').length;
           const results = {
             Started: number(campaignRuns.length),
-            Completed: number(completed),
+            Finished: number(completed),
             Waiting: number(waiting),
-            Completion: rate(completed, campaignRuns.length),
+            'Finish rate': rate(completed, campaignRuns.length),
           };
           return <article className="overview-campaign" key={campaign.id}>
             <div className="overview-campaign-name"><h3>{campaign.name}</h3><small>@{username(data, campaign.accountId)}</small></div>
@@ -70,7 +79,8 @@ export function Overview({ data, accountId, onCreate, onCampaigns, onActivity, o
     {metrics.failedActions > 0 && <button className="attention-banner" onClick={onActivity}><Icon icon={CircleAlert} /><span><strong>{number(metrics.failedActions)} actions need attention</strong>Review failed or uncertain sends in Activity.</span><Icon icon={ArrowRight} /></button>}
 
     <section className="overview-results" aria-label="Workspace results">
-      <dl>{highlights.map(item => <div key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd><dd className="overview-note">{item.note}</dd></div>)}</dl>
+      <h2>Conversation totals</h2>
+      <dl>{highlights.map(item => <div key={item.label}><dt>{item.label}</dt><dd>{number(item.value)}</dd><dd className="overview-note">{item.note}</dd></div>)}</dl>
     </section>
 
     <div className="overview-reports">
@@ -81,13 +91,21 @@ export function Overview({ data, accountId, onCreate, onCampaigns, onActivity, o
           <span className="overview-track" aria-hidden="true"><i style={{ width: `${step.count / largestStage * 100}%` }} /></span>
           <span className="overview-count">{number(step.count)}</span>
         </li>)}</ol>
+        <h3 className="overview-rate-heading">Conversion rates</h3>
         <dl className="overview-ratios">
-          <div><dt>Button response rate</dt><dd>{rate(metrics.buttonResponders, metrics.openingAccepted)}</dd></div>
-          <div><dt>Flow completion</dt><dd>{rate(metrics.completedRuns, runs.length)}</dd></div>
+          {rates.map(metric => <div key={metric.label}>
+            <dt>{metric.label}</dt>
+            <dd className="overview-rate">{rate(metric.numerator, metric.denominator)}</dd>
+            <dd className="overview-basis">{countWithUnit(metric.numerator, metric.numeratorLabel)} ÷ {countWithUnit(metric.denominator, metric.denominatorLabel)}</dd>
+          </div>)}
         </dl>
-        <details className="overview-definitions"><summary>How these numbers are calculated</summary>
-          <p>Button response rate is unique responding contacts divided by API-accepted opening messages. Link click-through is unique attributed clicking contacts divided by API-accepted link messages. Completion is completed runs divided by started runs. A dash means the denominator is zero.</p>
-          <p>Counts reflect the selected account and dates. Link previews and forwarded links can record visits without the original recipient opening the link.</p>
+        <details className="overview-definitions"><summary>How to read these numbers</summary>
+          <ul>
+            <li><strong>Time period.</strong> Counts follow the selected accounts and dates. A response or visit can come from a message sent earlier.</li>
+            <li><strong>Message status.</strong> Instagram acknowledges each accepted message. Delivery and read status are unavailable.</li>
+            <li><strong>Link attribution.</strong> Forwarded links and link previews can register a visit under the original contact. Known automated visits are excluded.</li>
+            <li><strong>Missing rates.</strong> A dash means there were no messages or conversations to divide by.</li>
+          </ul>
         </details>
       </section>
 

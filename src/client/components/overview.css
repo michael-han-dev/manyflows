@@ -60,12 +60,25 @@
 }
 .overview-campaign .status { justify-self: start; }
 .overview-campaign dl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); }
-.overview-campaign dt, .overview-ratios dt { font-size: var(--text-xs); color: var(--muted-foreground); }
+.overview-campaign dt { font-size: var(--text-xs); color: var(--muted-foreground); }
 .overview-campaign dd, .overview-count, .overview-ratios dd { font-variant-numeric: tabular-nums; }
 .overview-campaign dd { font-size: var(--text-md); font-weight: 550; margin-top: 2px; }
 
-.overview-results dl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-5); }
-.overview-results dl > div { border-top: 2px solid var(--ink); padding-top: 14px; }
+.overview-results dl { margin-top: var(--space-4); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-5); }
+.overview-results dl > div {
+  display: grid;
+  grid-row: span 3;
+  grid-template-rows: subgrid;
+  row-gap: var(--space-2);
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-3);
+}
+.overview-campaign dl > div {
+  display: grid;
+  grid-row: span 2;
+  grid-template-rows: subgrid;
+  row-gap: var(--space-1);
+}
 .overview-results dt, .overview-reach dt { font-size: var(--text-sm); font-weight: 540; }
 .overview-results dd:first-of-type, .overview-reach dd {
   font-size: var(--overview-metric-size);
@@ -79,22 +92,40 @@
 .overview-reports { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: var(--overview-report-gap); }
 .overview-reports > section { min-width: 0; }
 .workspace-overview .overview-stages, .workspace-overview .overview-accounts { margin-top: var(--space-4); }
-.overview-stages li {
+.overview-stages {
   display: grid;
   grid-template-columns: minmax(113px, .85fr) minmax(36px, 1fr) minmax(28px, auto);
   gap: var(--space-3);
   align-items: center;
-  padding: var(--space-2) 0;
+}
+.overview-stages li {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
+  padding-block: var(--space-2);
 }
 .overview-stages strong, .overview-accounts strong { font-weight: 540; font-size: var(--text-md); }
 .overview-track { display: block; height: 8px; background: var(--secondary); border-radius: 2px; overflow: hidden; }
 .overview-track i { display: block; height: 100%; background: var(--persimmon); }
 .overview-count { text-align: right; font-size: var(--text-md); }
-.workspace-overview .overview-ratios { display: flex; flex-wrap: wrap; gap: var(--space-5) var(--space-7); margin-top: var(--space-4); padding: var(--space-4) 0; border-top: 1px solid var(--border); }
-.overview-ratios dd { font-size: var(--heading-sm); letter-spacing: -.04em; }
-.overview-definitions { font-size: var(--text-xs); color: var(--muted-foreground); }
-.overview-definitions summary { cursor: pointer; width: fit-content; padding: var(--space-1) 0; }
-.overview-definitions p { max-width: 68ch; margin: var(--space-2) 0; line-height: 1.65; }
+.overview-rate-heading { margin: var(--space-5) 0 var(--space-2); font-size: var(--text-lg); }
+.overview-ratios > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  padding-block: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+}
+.overview-ratios dt { font-size: var(--text-md); font-weight: 550; }
+.overview-rate { text-align: end; font-size: var(--text-lg); font-variant-numeric: tabular-nums; }
+.overview-basis { grid-column: 1 / -1; color: var(--muted-foreground); font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
+.overview-definitions { margin-top: var(--space-2); color: var(--muted-foreground); font-size: var(--text-sm); }
+.overview-definitions summary { cursor: pointer; width: fit-content; padding-block: var(--space-2); }
+.workspace-overview .overview-definitions ul { display: grid; gap: var(--space-2); margin-block: var(--space-2); }
+.overview-definitions li { line-height: 1.55; }
+.overview-definitions strong { color: var(--ink); font-weight: 550; }
 .overview-accounts li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-2); padding: var(--space-3) 0; border-bottom: 1px solid var(--border); }
 .overview-accounts strong { overflow-wrap: anywhere; }
 .workspace-overview .overview-reach { margin-top: var(--space-5); }
