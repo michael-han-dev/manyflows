@@ -97,7 +97,8 @@ test('owner creates and publishes a campaign with five reply variants and a work
   await expect(page.getByText(name, { exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('campaigns-desktop.png'), fullPage: true, animations: 'disabled' });
   await page.getByRole('row').filter({ hasText: name }).getByRole('button', { name: 'Edit', exact: true }).click();
-  await actions.getByRole('button', { name: 'Pause', exact: true }).click();
+  await actions.getByRole('button', { name: 'More campaign actions' }).click();
+  await page.getByRole('menuitem', { name: 'Pause', exact: true }).click();
   await expect(status).toHaveText('Paused');
   await expect(actions.getByRole('button', { name: 'Publish campaign', exact: true })).toBeVisible();
   expect(errors).toEqual([]);
@@ -485,7 +486,8 @@ test('duplicating a live campaign opens a separate draft with its last saved set
   await expect(page.getByText('Unsaved changes', { exact: true })).toBeVisible();
   await expect(actions.getByRole('status')).toHaveText('Published');
 
-  await actions.getByRole('button', { name: 'Duplicate', exact: true }).click();
+  await actions.getByRole('button', { name: 'More campaign actions' }).click();
+  await page.getByRole('menuitem', { name: 'Duplicate', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Duplicate campaign', exact: true });
   await expect(dialog.getByText(/last saved settings/)).toBeVisible();
   await expect(dialog.getByText(/discard your unsaved edits/)).toBeVisible();
@@ -539,7 +541,8 @@ test('the owner deletes a contact through an explicit confirmation', async ({ pa
   expect((await page.request.post('/api/demo/comment', { data: incoming })).ok()).toBeTruthy();
   await page.reload();
   await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Contacts', exact: true }).click();
-  await page.getByRole('button', { name: `Delete contact @${username}`, exact: true }).click();
+  await page.getByRole('button', { name: `More actions for @${username}`, exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Delete contact', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Delete contact', exact: true });
   await expect(dialog.getByRole('button', { name: 'Permanently delete contact', exact: true })).toBeDisabled();
   await dialog.getByRole('textbox', { name: 'Type DELETE', exact: true }).fill('DELETE');
@@ -746,4 +749,26 @@ test('touch screens keep dropdowns, inputs and action buttons aligned', async ({
       await touch.screenshot({ path: testInfo.outputPath(`touch-editor-${width}.png`), animations: 'disabled' });
     }
   } finally { await context.close(); }
+});
+
+test('campaign row actions support keyboard navigation and act on the chosen campaign', async ({ page }) => {
+  await signIn(page);
+  const fixture = await publishFixture(page);
+  await page.reload();
+  await page.getByRole('navigation').getByRole('button', { name: /^Campaigns/ }).click();
+  const row = page.getByRole('row').filter({ hasText: fixture.input.name });
+  const more = row.getByRole('button', { name: `More actions for ${fixture.input.name}` });
+  await more.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('menuitem', { name: 'Pause' })).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByRole('menuitem', { name: 'Duplicate' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(more).toBeFocused();
+  await more.click();
+  await page.getByRole('menuitem', { name: 'Pause' }).click();
+  await expect(row.getByText('paused', { exact: true })).toBeVisible();
+  await more.click();
+  await page.getByRole('menuitem', { name: 'Publish' }).click();
+  await expect(row.getByText('live', { exact: true })).toBeVisible();
 });

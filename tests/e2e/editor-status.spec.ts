@@ -25,9 +25,13 @@ test('publication status follows confirmed actions when the workspace refresh fa
   await actions.getByRole('button', { name: 'Publish campaign', exact: true }).click();
   await expect.poll(async () => snapshotSchema.parse(await (await page.request.get('/api/bootstrap')).json()).campaigns.find(item => item.id === saved.id)?.status).toBe('live');
   await expect(actions.getByRole('status')).toHaveText('Published', { timeout: 3000 });
-  await actions.getByRole('button', { name: 'Pause', exact: true }).click();
+  await actions.getByRole('button', { name: 'More campaign actions' }).click();
+  await page.getByRole('menuitem', { name: 'Pause', exact: true }).click();
   await expect(actions.getByRole('status')).toHaveText('Paused');
-  await expect(actions.getByRole('button', { name: 'Pause', exact: true })).toHaveCount(0);
+  await actions.getByRole('button', { name: 'More campaign actions' }).click();
+  await expect(page.getByRole('menuitem', { name: 'Duplicate' })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: 'Pause', exact: true })).toHaveCount(0);
+  await page.keyboard.press('Escape');
   await page.unroute('**/api/bootstrap*');
   expect((await page.request.post(`/api/campaigns/${saved.id}/publish`)).ok()).toBeTruthy();
   await expect(actions.getByRole('status')).toHaveText('Published', { timeout: 12000 });

@@ -1,3 +1,4 @@
+import { MoreActions } from './MoreActions';
 import { useEffect, useState } from 'react';
 import { ArrowLeftIcon as ArrowLeft, CheckIcon as Check, CopyIcon as Copy, FileTextIcon as FileText, ImageIcon as Image, LayersIcon as Layers3, PauseIcon as Pause, PlayIcon as Play, PlusIcon as Plus, CheckIcon as Save, MagicWandIcon as Sparkles, TrashIcon as Trash2 } from '@radix-ui/react-icons';
 import { BUTTON_LABEL_LIMIT, BUTTON_MESSAGE_LIMIT, MAX_MESSAGE_BUTTONS, MAX_DELAY_SECONDS, MESSAGE_TEXT_LIMIT, buttonSchema, campaignInputSchema, validateFlow, type Account, type Button as FlowButton, type Campaign, type CampaignInput, type Media } from '../../shared/domain';
@@ -101,9 +102,11 @@ export function CampaignEditor({ campaign, initial, accounts, media, onBack, onS
       <div className="editor-actions" role="group" aria-label="Campaign actions">
         <span className="editor-state" role="status">{campaignStatusLabels[campaign?.status ?? 'draft']}</span>
         <Button onClick={() => void save(false)} disabled={Boolean(busy)}>{busy === 'save' ? <Spinner /> : <Icon icon={Save} size={16} />}Save draft</Button>
-        {campaign?.status === 'live' && <Button onClick={() => void perform('pause', onPause)} disabled={Boolean(busy)}><Icon icon={Pause} size={16} />Pause</Button>}
         <Button variant="primary" onClick={() => void save(true)} disabled={Boolean(busy) || !draft.accountId}>{busy === 'publish' ? <Spinner /> : <Icon icon={Play} size={16} />}{campaign?.status === 'live' ? 'Publish changes' : 'Publish campaign'}</Button>
-        {campaign && <Button onClick={() => setShowDuplicate(true)} disabled={Boolean(busy)}><Icon icon={Copy} size={16} />Duplicate</Button>}
+        {campaign && <MoreActions label="More campaign actions" disabled={Boolean(busy)} actions={[
+          ...(campaign.status === 'live' ? [{ label: 'Pause', icon: Pause, run: () => void perform('pause', onPause) }] : []),
+          { label: 'Duplicate', icon: Copy, run: () => setShowDuplicate(true) },
+        ]} />}
       </div>
     </div>
     {error && <div className="alert error" role="alert">{error}</div>}
