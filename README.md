@@ -2,7 +2,7 @@
 
 A private Instagram automation workspace for accounts you own and manage. Build comment-to-DM campaigns, edit branching flows, store conversations and leads, and attribute resource-link clicks to campaigns.
 
-The application uses TypeScript, React, Cloudflare Workers, D1, and Queues.
+The application uses TypeScript, React, Cloudflare Workers, D1, and Queues. Workspace tokens, reusable controls, and layout conventions are documented in [the design system](DESIGN.md).
 
 ## Run locally
 

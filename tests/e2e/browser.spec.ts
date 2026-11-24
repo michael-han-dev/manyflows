@@ -772,3 +772,26 @@ test('campaign row actions support keyboard navigation and act on the chosen cam
   await page.getByRole('menuitem', { name: 'Publish' }).click();
   await expect(row.getByText('live', { exact: true })).toBeVisible();
 });
+
+test('overview leads with live campaigns and keeps native keyboard scrolling available', async ({ page }) => {
+  await signIn(page);
+  const fixture = await publishFixture(page);
+  const draft = { ...fixture.input, name: `Draft ${fixture.keyword}` };
+  expect((await page.request.post('/api/campaigns', { data: draft })).ok()).toBeTruthy();
+  await page.reload();
+  const performance = page.getByRole('region', { name: 'Campaign performance' });
+  const cards = performance.getByRole('article');
+  await expect(cards.first().getByText('live', { exact: true })).toBeVisible();
+  const snapshot = campaignsSchema.parse(await (await page.request.get('/api/bootstrap')).json());
+  const liveCount = snapshot.campaigns.filter(campaign => campaign.status === 'live').length;
+  await expect(cards.getByText('live', { exact: true })).toHaveCount(Math.min(liveCount, await cards.count()));
+  const results = page.getByRole('region', { name: 'Workspace results' });
+  const performanceBounds = await performance.boundingBox();
+  const resultBounds = await results.boundingBox();
+  expect(performanceBounds && resultBounds && performanceBounds.y < resultBounds.y).toBeTruthy();
+  await page.setViewportSize({ width: 390, height: 640 });
+  await expect(page.locator('html')).toHaveCSS('scrollbar-width', 'none');
+  await page.locator('main').focus();
+  await page.keyboard.press('PageDown');
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+});
