@@ -58,6 +58,8 @@
   --space-table-y: 11px;
   --space-table-head-y: 9px;
   --preview-padding: clamp(18px, 3vw, 42px);
+  --preview-post-height: min(44dvh, 24rem);
+  --preview-attachment-size: 4.5rem;
   --preview-reading-width: 410px;
   --preview-message-height: min(400px, 44vh);
   --elevation-low: 0 1px 3px color-mix(in srgb, var(--shadow-color) 7%, transparent);

@@ -542,8 +542,9 @@
 .preview-post img {
   display: block;
   width: 100%;
-  max-height: 240px;
-  object-fit: cover;
+  max-height: var(--preview-post-height);
+  object-fit: contain;
+  background: var(--surface-1);
   border-radius: var(--radius-sm);
 }
 
@@ -711,21 +712,40 @@ button,a,input,select,textarea,summary {
   background: var(--muted);
 }
 
-.preview-post[data-context=comments] img{
-  max-height: 160px;
-}
-
-.preview-post[data-context=comments] .preview-post-placeholder{
-  min-height: 110px;
-}
-
-.preview-post[data-context=comments] p{
+.preview-post-description strong {
+  display: block;
   margin-top: var(--space-2);
-  font-size: var(--text-xs);
   color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+
+.preview-attachment {
+  display: grid;
+  grid-template-columns: var(--preview-attachment-size) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.preview-attachment img,
+.preview-attachment .preview-post-placeholder {
+  height: var(--preview-attachment-size);
+  min-height: 0;
+}
+
+.preview-attachment .preview-post-placeholder {
+  padding: var(--space-1);
+  font-size: var(--text-xs);
+}
+
+.preview-attachment .preview-post-description strong,
+.preview-attachment p {
+  margin: 0;
+}
+
+.preview-attachment p {
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   overflow: hidden;
 }
 
@@ -736,13 +756,6 @@ button,a,input,select,textarea,summary {
 
 .preview-comments p:last-child{
   margin-bottom: 0;
-}
-
-.preview-post-context{
-  display: block;
-  font-size: var(--text-xs);
-  color: var(--muted-foreground);
-  margin-bottom: var(--space-2);
 }
 
 /* The preview is a reading surface. Settings use a continuous column alongside it. */
