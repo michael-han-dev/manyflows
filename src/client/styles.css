@@ -307,13 +307,6 @@ code {
   padding: var(--space-5);
 }
 
-.eyebrow {
-  font-size: var(--text-sm);
-  font-weight: 600;
-  letter-spacing: 1.4px;
-  color: var(--muted-foreground);
-}
-
 .button {
   display: inline-flex;
   align-items: center;
@@ -1311,10 +1304,6 @@ code {
   flex-wrap: wrap;
 }
 
-.page-heading .eyebrow {
-  margin-bottom: var(--space-2);
-}
-
 .page-heading p {
   font-size: var(--text-md);
   color: var(--muted-foreground);
@@ -1362,290 +1351,6 @@ code {
   width: 4px;
   border-radius: 50%;
   display: inline-block;
-}
-
-.metric-grid {
-  display: grid;
-  grid-template-columns: repeat(4,minmax(0,1fr));
-  gap: var(--space-4);
-  margin-bottom: var(--space-5);
-}
-
-.metric {
-  padding: var(--space-5);
-  min-height: 144px;
-}
-
-.metric>div {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: var(--space-2);
-  font-size: var(--text-sm);
-  color: var(--muted-foreground);
-  overflow-wrap: anywhere;
-}
-
-.metric svg {
-  color: var(--muted-foreground);
-}
-
-.metric>strong {
-  font-size: var(--heading-lg);
-  display: block;
-  font-weight: 600;
-  letter-spacing: -.035em;
-  margin: var(--space-3) 0 var(--space-2);
-  color: var(--foreground);
-  line-height: 1.1;
-  overflow-wrap: anywhere;
-  font-variant-numeric: tabular-nums;
-}
-
-.metric>small {
-  font-size: var(--text-xs);
-  color: var(--muted-foreground);
-  display: block;
-  line-height: 1.5;
-}
-
-.overview-grid {
-  display: grid;
-  grid-template-columns: 1.6fr 1fr;
-  gap: var(--space-5);
-  margin-bottom: var(--space-5);
-}
-
-.funnel-card .card-heading {
-  padding-bottom: var(--space-4);
-}
-
-.funnel {
-  padding: 0 var(--space-5) var(--space-5);
-}
-
-.funnel-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: 72px;
-  padding: var(--space-2) 0;
-}
-
-.funnel-index {
-  font-size: var(--text-sm);
-  color: var(--muted-foreground);
-  font-variant-numeric: tabular-nums;
-}
-
-.funnel-label {
-  width: 131px;
-  flex-shrink: 0;
-  overflow-wrap: anywhere;
-}
-
-.funnel-label strong {
-  font-size: var(--text-md);
-  font-weight: 600;
-  display: block;
-}
-
-.funnel-label small {
-  font-size: var(--text-sm);
-  color: var(--muted-foreground);
-  margin-top: var(--space-1);
-  display: block;
-}
-
-.funnel-track {
-  height: 8px;
-  border-radius: 2px;
-  background: var(--background);
-  flex: 1;
-  overflow: hidden;
-}
-
-.funnel-track>span {
-  display: block;
-  height: 100%;
-  border-radius: 2px;
-  background: var(--accent);
-  min-width: 0;
-}
-
-.funnel-count {
-  font-size: var(--text-md);
-  font-weight: 600;
-  color: var(--muted-foreground);
-  min-width: 36px;
-  text-align: right;
-}
-
-.funnel-footer {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-4);
-  border-top: 1px solid var(--border);
-  margin: 0 var(--space-5);
-  padding: var(--space-4) 0;
-  font-size: var(--text-sm);
-  color: var(--muted-foreground);
-  flex-wrap: wrap;
-}
-
-.funnel-footer strong {
-  color: var(--foreground);
-  font-size: var(--text-md);
-  margin-left: var(--space-1);
-}
-
-.metric-definitions {
-  border-top: 1px solid var(--border);
-  background: var(--card);
-  padding: var(--space-3) var(--space-5);
-  color: var(--muted-foreground);
-  font-size: var(--text-sm);
-}
-
-.metric-definitions summary {
-  cursor: pointer;
-  font-size: var(--text-sm);
-}
-
-.metric-definitions p {
-  margin-top: var(--space-2);
-  font-size: var(--text-sm);
-  line-height: 1.8;
-}
-
-.accounts-summary {
-  display: flex;
-  flex-direction: column;
-}
-
-.accounts-summary .card-heading {
-  padding-bottom: var(--space-2);
-}
-
-.account-summary-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-4) var(--space-5);
-  border-bottom: 1px solid var(--border);
-}
-
-.account-summary-row>.avatar {
-  background: var(--muted);
-  color: var(--muted-foreground);
-  width: 33px;
-  height: 33px;
-  font-size: var(--text-md);
-}
-
-.account-summary-row>div {
-  flex: 1;
-  min-width: 0;
-}
-
-.account-summary-row strong {
-  font-size: var(--text-md);
-  font-weight: 600;
-  overflow-wrap: anywhere;
-}
-
-.account-summary-row small {
-  font-size: var(--text-sm);
-  display: block;
-  color: var(--muted-foreground);
-  margin-top: 3px;
-}
-
-.account-summary-row .status {
-  font-size: var(--text-sm);
-  padding: var(--space-1) var(--space-1);
-}
-
-.reach-summary {
-  margin-top: auto;
-  padding: var(--space-5) var(--space-5) var(--space-5);
-  background: var(--card);
-  border-top: 1px solid var(--border);
-}
-
-.reach-summary>span {
-  font-size: var(--text-md);
-  color: var(--muted-foreground);
-}
-
-.reach-summary>strong {
-  font-size: var(--heading-md);
-  letter-spacing: -.02em;
-  font-weight: 600;
-  color: var(--foreground);
-  display: block;
-  margin-top: var(--space-2);
-}
-
-.reach-summary small {
-  font-size: var(--text-sm);
-  color: var(--muted-foreground);
-  display: block;
-  margin-top: var(--space-2);
-  max-width: 240px;
-}
-
-.onboarding-card {
-  border: 1px solid var(--border);
-  background: var(--background);
-  border-radius: var(--radius-md);
-  display: flex;
-  gap: var(--space-5);
-  padding: var(--space-5);
-  margin-bottom: var(--space-5);
-  align-items: center;
-}
-
-.onboarding-art {
-  width: 86px;
-  height: 86px;
-  flex-shrink: 0;
-  border-radius: 50%;
-  background: var(--muted);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--muted-foreground);
-  position: relative;
-}
-
-.onboarding-art>span {
-  position: absolute;
-  bottom: -1px;
-  right: -2px;
-  display: flex;
-  border: 4px solid var(--border);
-  border-radius: 50%;
-  padding: var(--space-1);
-  background: var(--accent);
-  color: var(--foreground);
-}
-
-.onboarding-card h2 {
-  font-size: var(--heading-md);
-  margin: var(--space-2) 0 var(--space-2);
-  color: var(--foreground);
-}
-
-.onboarding-card p {
-  font-size: var(--text-md);
-  color: var(--muted-foreground);
-  max-width: 600px;
-  margin-bottom: var(--space-4);
-}
-
-.onboarding-card .field-hint {
-  margin: 0;
 }
 
 .attention-banner {
@@ -3267,12 +2972,6 @@ code {
   font-size: var(--text-md);
 }
 
-.login-story .eyebrow {
-  color: var(--persimmon);
-  font-size: var(--text-sm);
-  letter-spacing: 1.6px;
-}
-
 .login-story h1 {
   font-size: var(--display-lg);
   letter-spacing: -.055em;
@@ -3373,16 +3072,6 @@ code {
   margin-top: var(--space-5);
 }
 
-.login-bottom {
-  position: absolute;
-  bottom: 32px;
-  font-size: var(--text-sm);
-  color: var(--muted-foreground);
-  left: 20px;
-  right: 20px;
-  text-align: center;
-}
-
 .login-form>.alert {
   font-size: var(--text-md);
   margin-bottom: var(--space-4);
@@ -3390,148 +3079,6 @@ code {
 
 .mobile-login-brand {
   display: none;
-}
-
-.login-illustration {
-  margin-top: var(--space-7);
-  margin-bottom: var(--space-4);
-  width: 310px;
-  max-width: 100%;
-  padding-left: var(--space-2);
-  position: relative;
-}
-
-.illustration-comment {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  border: 1px solid var(--border);
-  background: var(--accent);
-  box-shadow: 0 7px 25px color-mix(in srgb, var(--shadow-color) 8%, transparent);
-  border-radius: var(--radius-md);
-  padding: var(--space-4) var(--space-4);
-  width: 235px;
-  position: relative;
-}
-
-.illustration-resource {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-3);
-  border: 1px solid var(--border);
-  background: var(--accent);
-  box-shadow: 0 7px 25px color-mix(in srgb, var(--shadow-color) 8%, transparent);
-  border-radius: var(--radius-md);
-  padding: var(--space-4) var(--space-4);
-  width: 250px;
-  position: relative;
-  margin-left: var(--space-7);
-  padding-top: var(--space-4);
-  padding-bottom: var(--space-4);
-}
-
-.illustration-comment>span {
-  height: 32px;
-  width: 32px;
-  border-radius: 50%;
-  background: var(--accent);
-  color: var(--muted-foreground);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.illustration-resource>span:first-child {
-  height: 32px;
-  width: 32px;
-  border-radius: 50%;
-  background: var(--accent);
-  color: var(--muted-foreground);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.illustration-comment>div {
-  flex: 1;
-  min-width: 0;
-}
-
-.illustration-resource>div {
-  flex: 1;
-  min-width: 0;
-}
-
-.illustration-comment i {
-  height: 4px;
-  background: color-mix(in srgb,var(--foreground) 22%,transparent);
-  display: block;
-  border-radius: 3px;
-  width: 100%;
-  margin: var(--space-1) 0;
-}
-
-.illustration-resource i {
-  height: 4px;
-  background: color-mix(in srgb,var(--foreground) 22%,transparent);
-  display: block;
-  border-radius: 3px;
-  width: 100%;
-  margin: var(--space-1) 0;
-}
-
-.illustration-comment i:last-child {
-  width: 68%;
-  background: color-mix(in srgb,var(--foreground) 22%,transparent);
-}
-
-.illustration-resource i:last-of-type {
-  width: 68%;
-  background: color-mix(in srgb,var(--foreground) 22%,transparent);
-}
-
-.illustration-comment b {
-  font-size: var(--text-lg);
-  color: var(--muted-foreground);
-  font-weight: 600;
-}
-
-.illustration-line {
-  height: 30px;
-  border-left: 1px dashed var(--border);
-  margin-left: var(--space-7);
-}
-
-.illustration-resource em {
-  font-size: var(--text-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-1);
-  color: var(--muted-foreground);
-  font-style: normal;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: var(--space-2) var(--space-1);
-  margin-top: var(--space-4);
-  white-space: nowrap;
-}
-
-.illustration-resource .illustration-check {
-  position: absolute;
-  right: -12px;
-  bottom: 16px;
-  height: 26px;
-  width: 26px;
-  background: var(--primary);
-  color: var(--primary);
-  border: 4px solid var(--border);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .button.danger {
@@ -3619,11 +3166,6 @@ code {
 
 .tags span {
   color: var(--accent-foreground);
-}
-
-.illustration-check {
-  color: var(--primary-foreground);
-  background: var(--primary);
 }
 
 .nav-scrim {
@@ -4098,38 +3640,6 @@ th, td {
     font-size: var(--heading-lg);
     max-width: none;
   }
-
-  .metric {
-    padding: var(--space-5);
-  }
-
-  .overview-grid {
-    gap: var(--space-5);
-  }
-
-  .metric-grid {
-    gap: var(--space-5);
-  }
-
-  .funnel-row {
-    min-height: 63px;
-  }
-
-  .funnel-label {
-    width: 155px;
-  }
-
-  .funnel-label strong {
-    font-size: var(--text-md);
-  }
-
-  .funnel-label small {
-    font-size: var(--text-sm);
-  }
-
-  .account-summary-row {
-    padding: var(--space-5) var(--space-5);
-  }
 }
 
 @media (max-width:1279px) {
@@ -4201,53 +3711,6 @@ th, td {
     line-height: 1.6;
   }
 
-  .metric-grid {
-    gap: var(--space-3);
-  }
-
-  .metric {
-    padding: var(--space-4);
-  }
-
-  .metric>div {
-    font-size: var(--text-md);
-  }
-
-  .metric>strong {
-    font-size: var(--heading-lg);
-    letter-spacing: -.035em;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .metric>small {
-    font-size: var(--text-sm);
-  }
-
-  .overview-grid {
-    grid-template-columns: 1.4fr 1fr;
-    gap: var(--space-4);
-  }
-
-  .funnel-label {
-    width: 110px;
-  }
-
-  .funnel-row {
-    gap: var(--space-2);
-  }
-
-  .funnel-label strong {
-    font-size: var(--text-sm);
-  }
-
-  .funnel-label small {
-    font-size: var(--text-sm);
-  }
-
-  .funnel-count {
-    font-size: var(--text-md);
-  }
-
   .card-heading {
     padding: var(--space-5);
   }
@@ -4258,45 +3721,6 @@ th, td {
 
   .card-heading p {
     font-size: var(--text-sm);
-  }
-
-  .funnel {
-    padding-left: var(--space-5);
-    padding-right: var(--space-5);
-  }
-
-  .account-summary-row {
-    padding: var(--space-4) var(--space-4);
-  }
-
-  .account-summary-row .status {
-    font-size: var(--text-sm);
-  }
-
-  .account-summary-row strong {
-    font-size: var(--text-md);
-  }
-
-  .account-summary-row small {
-    font-size: var(--text-sm);
-  }
-
-  .reach-summary {
-    padding: var(--space-4);
-  }
-
-  .reach-summary small {
-    font-size: var(--text-sm);
-  }
-
-  .funnel-footer {
-    font-size: var(--text-sm);
-    margin: 0 var(--space-5);
-  }
-
-  .funnel-footer strong {
-    font-size: var(--text-sm);
-    margin-left: 3px;
   }
 
   .settings-layout {
@@ -4480,87 +3904,6 @@ th, td {
 }
 
 @media (max-width:1023px) {
-  .metric-grid {
-    grid-template-columns: repeat(2,minmax(0,1fr));
-    gap: var(--space-4);
-  }
-
-  .metric {
-    padding: var(--space-4);
-  }
-
-  .metric>div {
-    font-size: var(--text-md);
-  }
-
-  .metric>strong {
-    font-size: var(--heading-lg);
-    letter-spacing: -.035em;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .metric>small {
-    font-size: var(--text-sm);
-  }
-
-  .overview-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .funnel-label {
-    width: 145px;
-  }
-
-  .funnel-label strong {
-    font-size: var(--text-md);
-  }
-
-  .funnel-label small {
-    font-size: var(--text-sm);
-  }
-
-  .funnel-row {
-    min-height: 55px;
-  }
-
-  .funnel-count {
-    font-size: var(--text-lg);
-  }
-
-  .funnel-footer {
-    font-size: var(--text-md);
-  }
-
-  .accounts-summary .card-heading {
-    padding-bottom: var(--space-4);
-  }
-
-  .reach-summary {
-    margin-top: var(--space-2);
-    padding: var(--space-4) var(--space-5);
-  }
-
-  .account-summary-row strong {
-    font-size: var(--text-md);
-  }
-
-  .account-summary-row small {
-    font-size: var(--text-sm);
-  }
-
-  .account-summary-row .status {
-    font-size: var(--text-sm);
-  }
-
-  .account-summary-row>.avatar {
-    height: 35px;
-    width: 35px;
-  }
-
-  .reach-summary small {
-    max-width: none;
-    font-size: var(--text-sm);
-  }
 
   .settings-layout {
     grid-template-columns: 1fr;
@@ -4672,32 +4015,6 @@ th, td {
     max-width: 145px;
   }
 
-  .onboarding-card {
-    padding: var(--space-5);
-    gap: var(--space-4);
-  }
-
-  .onboarding-card h2 {
-    font-size: var(--heading-sm);
-  }
-
-  .onboarding-art {
-    width: 67px;
-    height: 67px;
-  }
-
-  .onboarding-art>svg {
-    width: 34px;
-  }
-
-  .onboarding-card p {
-    font-size: var(--text-md);
-  }
-
-  .onboarding-card .field-hint {
-    font-size: var(--text-sm);
-  }
-
   .app-footer {
     padding-left: var(--space-5);
     padding-right: var(--space-5);
@@ -4720,22 +4037,12 @@ th, td {
     font-size: var(--text-md);
   }
 
-  .login-illustration {
-    transform: scale(.9);
-    transform-origin: left center;
-    margin-top: var(--space-5);
-  }
-
   .login-form-wrap {
     padding: var(--space-7) var(--space-6);
   }
 
   .login-form h2 {
     font-size: var(--heading-md);
-  }
-
-  .login-bottom {
-    font-size: var(--text-sm);
   }
 
   .topbar {
@@ -4746,10 +4053,6 @@ th, td {
   }
 
   .custom-dates label {
-    flex-wrap: wrap;
-  }
-
-  .button-editor>.inline {
     flex-wrap: wrap;
   }
 }
@@ -4976,10 +4279,6 @@ th, td {
     display: none;
   }
 
-  .onboarding-art {
-    display: none;
-  }
-
   .custom-dates {
     padding: var(--space-3) var(--space-4);
   }
@@ -4998,15 +4297,6 @@ th, td {
 
   .login-story p {
     font-size: var(--text-md);
-  }
-
-  .login-story .eyebrow {
-    font-size: var(--text-sm);
-  }
-
-  .login-illustration {
-    transform: scale(.8);
-    margin-left: -5px;
   }
 
   .login-story>small {
@@ -5200,12 +4490,6 @@ th, td {
     max-width: none;
   }
 
-  .page-heading .eyebrow {
-    font-size: var(--text-sm);
-    letter-spacing: 1.2px;
-    margin-bottom: var(--space-2);
-  }
-
   .page-heading p {
     font-size: var(--text-md);
     max-width: 250px;
@@ -5225,86 +4509,6 @@ th, td {
     flex-wrap: wrap;
   }
 
-  .page-heading:has(.eyebrow) {
-    display: block;
-  }
-
-  .page-heading:has(.eyebrow) .button {
-    margin-top: var(--space-4);
-  }
-
-  .metric-grid {
-    gap: var(--space-2);
-    margin-bottom: var(--space-4);
-  }
-
-  .metric {
-    padding: var(--space-4);
-  }
-
-  .metric>div {
-    font-size: var(--text-xs);
-    gap: var(--space-1);
-    flex-wrap: wrap;
-  }
-
-  .metric>div svg {
-    width: 15px;
-    height: 15px;
-  }
-
-  .metric>strong {
-    font-size: var(--heading-md);
-    margin: var(--space-4) 0 var(--space-2);
-    letter-spacing: -.035em;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .metric>small {
-    font-size: var(--text-xs);
-    line-height: 1.7;
-    min-height: 0;
-  }
-
-  .overview-grid {
-    gap: var(--space-4);
-    margin-bottom: var(--space-4);
-  }
-
-  .funnel {
-    padding: 0 var(--space-4) var(--space-4);
-  }
-
-  .funnel-label {
-    width: 46%;
-  }
-
-  .funnel-label strong {
-    font-size: var(--text-md);
-  }
-
-  .funnel-label small {
-    font-size: var(--text-sm);
-  }
-
-  .funnel-row {
-    gap: var(--space-2);
-    min-height: 55px;
-  }
-
-  .funnel-index {
-    font-size: var(--text-sm);
-  }
-
-  .funnel-count {
-    font-size: var(--text-md);
-    min-width: 22px;
-  }
-
-  .funnel-track {
-    height: 7px;
-  }
-
   .card-heading {
     padding: var(--space-4);
   }
@@ -5318,51 +4522,6 @@ th, td {
   }
 
   .card-heading .text-button {
-    font-size: var(--text-sm);
-  }
-
-  .funnel-footer {
-    margin-left: var(--space-4);
-    margin-right: var(--space-4);
-    font-size: var(--text-sm);
-    padding: var(--space-4) 0;
-    gap: var(--space-2);
-  }
-
-  .funnel-footer strong {
-    font-size: var(--text-md);
-    margin-left: var(--space-1);
-  }
-
-  .metric-definitions {
-    padding: var(--space-3) var(--space-4);
-  }
-
-  .metric-definitions summary {
-    font-size: var(--text-sm);
-  }
-
-  .metric-definitions p {
-    font-size: var(--text-sm);
-  }
-
-  .account-summary-row {
-    padding: var(--space-4) var(--space-4);
-    display: grid;
-    grid-template-columns: 35px minmax(0,1fr);
-    gap: var(--space-2) var(--space-2);
-  }
-
-  .reach-summary {
-    padding: var(--space-5) var(--space-4);
-    margin-top: 0;
-  }
-
-  .reach-summary>strong {
-    font-size: var(--heading-lg);
-  }
-
-  .reach-summary small {
     font-size: var(--text-sm);
   }
 
@@ -5394,28 +4553,6 @@ th, td {
 
   .app-footer {
     padding: var(--space-4) var(--space-4);
-    font-size: var(--text-sm);
-  }
-
-  .onboarding-card {
-    padding: var(--space-5);
-  }
-
-  .onboarding-card h2 {
-    font-size: var(--heading-sm);
-    line-height: 1.5;
-  }
-
-  .onboarding-card .eyebrow {
-    font-size: var(--text-sm);
-  }
-
-  .onboarding-card p {
-    font-size: var(--text-md);
-    line-height: 1.9;
-  }
-
-  .onboarding-card .field-hint {
     font-size: var(--text-sm);
   }
 
@@ -6237,27 +5374,8 @@ th, td {
     margin-top: var(--space-5);
   }
 
-  .login-bottom {
-    font-size: var(--text-sm);
-    bottom: 30px;
-    line-height: 1.5;
-  }
-
   .login-form>.alert {
     font-size: var(--text-md);
-  }
-
-  .account-summary-row>.avatar {
-    grid-row: span 2;
-  }
-
-  .account-summary-row>.status {
-    grid-column: 2;
-    justify-self: start;
-  }
-
-  .funnel-footer>span {
-    max-width: 100%;
   }
 
   .content-table tbody tr {
@@ -6382,29 +5500,6 @@ th, td {
     max-width: none;
   }
 
-  .metric {
-    padding: var(--space-3) var(--space-3);
-  }
-
-  .metric>div {
-    font-size: var(--text-xs);
-  }
-
-  .metric>div>svg {
-    width: 13px;
-    height: 13px;
-  }
-
-  .metric>strong {
-    font-size: var(--heading-md);
-    letter-spacing: -.035em;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .metric>small {
-    font-size: var(--text-xs);
-  }
-
   .editor-section {
     padding: var(--space-4);
   }
@@ -6412,30 +5507,6 @@ th, td {
   .editor-actions .button>svg {
     width: 14px;
     height: 14px;
-  }
-
-  .funnel-label {
-    width: 112px;
-  }
-
-  .funnel-label strong {
-    font-size: var(--text-sm);
-  }
-
-  .funnel-label small {
-    font-size: var(--text-sm);
-  }
-
-  .funnel-row {
-    gap: var(--space-2);
-  }
-
-  .funnel-footer {
-    font-size: var(--text-sm);
-  }
-
-  .funnel-footer strong {
-    font-size: var(--text-sm);
   }
 
   .segmented button {
