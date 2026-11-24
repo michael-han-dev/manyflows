@@ -1,3 +1,4 @@
+import { chooseOption } from './select-option';
 import { expect, test } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
@@ -14,7 +15,7 @@ test('publication status follows confirmed actions when the workspace refresh fa
   await page.getByRole('button', { name: 'Create campaign', exact: true }).first().click();
   const name = `Status ${randomUUID().slice(0, 8)}`;
   await page.getByRole('textbox', { name: 'Campaign name', exact: true }).fill(name);
-  await page.getByRole('combobox', { name: 'Campaign account', exact: true }).selectOption('demo-studio');
+  await chooseOption(page, 'Campaign account', /^@northstar\.studio · Demo$/);
   const actions = page.getByRole('group', { name: 'Campaign actions', exact: true });
   await actions.getByRole('button', { name: 'Save draft', exact: true }).click();
   await expect(page.getByText('All changes saved', { exact: true })).toBeVisible();

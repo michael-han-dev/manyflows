@@ -3,7 +3,7 @@
     background: var(--muted);
   }
 
-  .global-filters select:hover {
+  .global-filters .select-control:hover {
     background: var(--surface-hover);
   }
 }
@@ -376,9 +376,6 @@
 
   .global-filters .select-control {
     max-width: 140px;
-  }
-
-  .global-filters select {
     font-size: var(--text-sm);
   }
 
@@ -449,7 +446,7 @@
     max-width: 140px;
   }
 
-  .global-filters .select-control:has(.date-select) {
+  .global-filters .select-control.date-select {
     max-width: 115px;
   }
 
@@ -808,21 +805,11 @@
   .global-filters .select-control {
     max-width: 100%;
     width: 100%;
-  }
-
-  .global-filters select {
     font-size: var(--text-sm);
   }
 
-  .global-filters .select-control:has(.date-select) {
+  .global-filters .select-control.date-select {
     max-width: 100%;
-  }
-
-  .account-select-icon {
-    top: 50%;
-    left: 8px;
-    transform: translateY(-50%);
-    display: none;
   }
 
   .account-select .select-control {
@@ -1327,7 +1314,7 @@
     font-size: var(--text-md);
   }
 
-  .field select {
+  .field .select-control {
     font-size: var(--text-md);
   }
 
@@ -1759,11 +1746,11 @@
     font-size: var(--text-md);
   }
 
-  input,select,textarea {
+  input,.select-control,textarea {
     font-size: var(--text-lg);
   }
 
-  .field input,.field select,.field textarea {
+  .field input,.field .select-control,.field textarea {
     font-size: var(--text-lg);
   }
 
@@ -1788,9 +1775,6 @@
     justify-self: start;
   }
 
-  .account-select select{
-    padding-left: var(--space-3);
-  }
 }
 
 @media (max-width:380px) {
@@ -1817,9 +1801,6 @@
 
   .global-filters .select-control {
     max-width: 124px;
-  }
-
-  .global-filters select {
     font-size: var(--text-sm);
   }
 
@@ -1827,23 +1808,11 @@
     max-width: 124px;
   }
 
-  .account-select select {
-    padding-left: var(--space-3);
-  }
-
-  .global-filters .select-control:has(.date-select) {
+  .global-filters .select-control.date-select {
     max-width: 100%;
     width: 100%;
   }
 
-  .account-select-icon {
-    left: 7px;
-  }
-
-  .account-select-icon svg {
-    width: 14px;
-    height: 14px;
-  }
 
   .main-content {
     padding: var(--space-5) var(--space-3) var(--space-7);

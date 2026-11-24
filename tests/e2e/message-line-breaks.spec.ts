@@ -1,3 +1,4 @@
+import { chooseOption } from './select-option';
 import { expect, test } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
@@ -17,7 +18,7 @@ test('message line breaks survive the preview and automation conversation', asyn
   await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: /^Campaigns/ }).click();
   await page.getByRole('button', { name: 'Create campaign', exact: true }).first().click();
   await page.getByRole('textbox', { name: 'Campaign name', exact: true }).fill(name);
-  await page.getByRole('combobox', { name: 'Campaign account', exact: true }).selectOption('demo-studio');
+  await chooseOption(page, 'Campaign account', /^@northstar\.studio · Demo$/);
   await page.getByRole('textbox', { name: 'Include keywords', exact: true }).fill(keyword);
   await page.getByRole('textbox', { name: 'Opening message', exact: true }).fill(opening);
   await page.getByRole('textbox', { name: 'Resource message', exact: true }).fill(resource);
@@ -42,8 +43,8 @@ test('message line breaks survive the preview and automation conversation', asyn
   await expect.poll(async () => snapshotSchema.parse(await (await page.request.get('/api/bootstrap')).json()).campaigns.find(item => item.name === name)?.status).toBe('live');
   await page.getByRole('button', { name: 'Open demo studio', exact: true }).click();
   const studio = page.getByRole('dialog', { name: 'Demo studio', exact: true });
-  await studio.getByRole('combobox', { name: 'Demo account', exact: true }).selectOption('demo-studio');
-  await studio.getByRole('combobox', { name: 'Demo media', exact: true }).selectOption('demo-reel-guide');
+  await chooseOption(page, 'Demo account', '@northstar.studio');
+  await chooseOption(page, 'Demo media', /^Three simple ideas for your next creative project/);
   await studio.getByLabel('Demo username', { exact: true }).fill(`lines-${keyword}`);
   await studio.getByLabel('Demo comment', { exact: true }).fill(keyword);
   await studio.getByRole('button', { name: 'Simulate comment', exact: true }).click();

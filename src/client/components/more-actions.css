@@ -1,6 +1,5 @@
 .more-actions {
   --menu-width: 10rem;
-  --menu-layer: 100;
   z-index: var(--menu-layer);
   min-width: var(--menu-width);
   padding: var(--space-1);

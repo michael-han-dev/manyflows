@@ -627,7 +627,7 @@ button:focus-visible,a:focus-visible,summary:focus-visible {
   outline-offset: 3px;
 }
 
-input:focus,select:focus,textarea:focus {
+input:focus,textarea:focus {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 18%, transparent);
 }
 
@@ -642,7 +642,7 @@ input,textarea {
   transition: border-color var(--motion-fast), box-shadow var(--motion-fast), background-color var(--motion-fast);
 }
 
-input:hover,select:hover,textarea:hover {
+input:hover,textarea:hover {
   border-color: var(--border-hover);
 }
 
@@ -684,7 +684,7 @@ input[type=checkbox],input[type=radio] {
   animation: fade-in var(--motion-normal) var(--ease-out);
 }
 
-button,a,input,select,textarea,summary {
+button,a,input,textarea,summary {
   scroll-margin-block: var(--space-5);
 }
 

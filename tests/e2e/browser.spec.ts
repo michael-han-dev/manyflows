@@ -1,3 +1,4 @@
+import { chooseOption } from './select-option';
 import { expect, test, type Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
@@ -24,8 +25,10 @@ async function signIn(page: Page) {
   const seeded = await page.request.post('/api/demo/seed');
   expect(seeded.ok()).toBeTruthy();
   await page.reload();
-  await expect(page.getByLabel('Account filter').locator('option')).toHaveCount(3);
-  await page.getByLabel('Date range').selectOption('all');
+  await page.getByRole('combobox', { name: 'Account filter' }).click();
+  await expect(page.getByRole('listbox').getByRole('option')).toHaveCount(3);
+  await page.keyboard.press('Escape');
+  await chooseOption(page, 'Date range', 'All time');
 }
 
 test('owner creates and publishes a campaign with five reply variants and a working conversation', async ({ page }, testInfo) => {
@@ -41,7 +44,7 @@ test('owner creates and publishes a campaign with five reply variants and a work
   const name = `Browser campaign ${Date.now()}`;
   const keyword = `BROWSER${Date.now()}`;
   await page.getByRole('textbox', { name: 'Campaign name', exact: true }).fill(name);
-  await page.getByRole('combobox', { name: 'Campaign account', exact: true }).selectOption('demo-studio');
+  await chooseOption(page, 'Campaign account', '@northstar.studio · Demo');
   await page.getByRole('textbox', { name: 'Include keywords', exact: true }).fill(keyword);
   await page.getByRole('button', { name: 'Add reply variation', exact: true }).click();
   await page.getByRole('textbox', { name: 'Public reply 4', exact: true }).fill('A fourth variation, saved by the owner.');
@@ -78,8 +81,8 @@ test('owner creates and publishes a campaign with five reply variants and a work
   expect(snapshot.campaigns.find(item => item.name === name)?.draft.replyVariations).toHaveLength(5);
   await page.getByRole('button', { name: 'Open demo studio', exact: true }).click();
   const studio = page.getByRole('dialog', { name: 'Demo studio', exact: true });
-  await studio.getByRole('combobox', { name: 'Demo account', exact: true }).selectOption('demo-studio');
-  await studio.getByRole('combobox', { name: 'Demo media', exact: true }).selectOption('demo-reel-guide');
+  await chooseOption(page, 'Demo account', '@northstar.studio');
+  await chooseOption(page, 'Demo media', /^Three simple ideas for your next creative project/);
   await studio.getByLabel('Demo username', { exact: true }).fill(`browser-${Date.now()}`);
   await studio.getByLabel('Demo comment', { exact: true }).fill(keyword);
   await studio.getByRole('button', { name: 'Simulate comment', exact: true }).click();
@@ -166,7 +169,7 @@ test('one-page builder shows the full example flow and preserves optional copy a
   await page.getByRole('button', { name: 'Create campaign', exact: true }).first().click();
   const name = `Vertical ${randomUUID().slice(0, 8)}`;
   await page.getByRole('textbox', { name: 'Campaign name', exact: true }).fill(name);
-  await page.getByRole('combobox', { name: 'Campaign account', exact: true }).selectOption('demo-studio');
+  await chooseOption(page, 'Campaign account', '@northstar.studio · Demo');
   await page.getByRole('textbox', { name: 'Opening message', exact: true }).fill('Your opening preview.');
   await page.getByRole('textbox', { name: 'Opening button label', exact: true }).fill('Send resources');
   const preview = page.getByRole('complementary', { name: 'Campaign preview', exact: true });
@@ -669,7 +672,7 @@ test('preview includes post context and workspace controls have consistent spaci
   await signIn(page);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.getByRole('button', { name: 'Create campaign', exact: true }).first().click();
-  await page.getByLabel('Campaign account', { exact: true }).selectOption('demo-studio');
+  await chooseOption(page, 'Campaign account', '@northstar.studio · Demo');
   await page.getByRole('button', { name: /Specific post or reel/ }).click();
   const selectedPost = page.getByRole('group', { name: 'Choose content', exact: true }).getByRole('button').first();
   await selectedPost.click();
@@ -692,7 +695,7 @@ test('preview includes post context and workspace controls have consistent spaci
         if (!element) throw new Error('Missing workspace control');
         const style = getComputedStyle(element);
         const arrow = element.closest('.select-control')?.querySelector('svg');
-        return { height: element.getBoundingClientRect().height, appearance: style.appearance, paddingRight: parseFloat(style.paddingRight), arrowInset: arrow ? element.getBoundingClientRect().right - arrow.getBoundingClientRect().right : null };
+        return { height: element.getBoundingClientRect().height, paddingRight: parseFloat(style.paddingRight), arrowInset: arrow ? element.getBoundingClientRect().right - arrow.getBoundingClientRect().right : null };
       });
       return { workspaceText: workspace?.textContent, workspaceIcons: workspace?.querySelectorAll('svg').length, headerMarkers: header?.querySelectorAll('.status i,.save-indicator').length, workspaceLineHeight: workspaceText?.getBoundingClientRect().height, workspaceTextLineHeight: workspaceText ? parseFloat(getComputedStyle(workspaceText).lineHeight) : null, controls };
     });
@@ -702,7 +705,6 @@ test('preview includes post context and workspace controls have consistent spaci
     expect.soft(measurements.headerMarkers).toBe(0);
     expect.soft(new Set(measurements.controls.map(control => control.height)).size, 'Account, date and form controls must share one height').toBe(1);
     for (const select of measurements.controls) {
-      expect.soft(select.appearance, 'Dropdown arrows need app-owned edge spacing').toBe('none');
       expect.soft(select.paddingRight).toBeGreaterThanOrEqual(32);
       expect.soft(select.arrowInset).toBeGreaterThanOrEqual(8);
     }
@@ -737,12 +739,12 @@ test('touch screens keep dropdowns, inputs and action buttons aligned', async ({
     expect(bounds.scroll).toBeLessThanOrEqual(bounds.width + 1);
     for (const width of [390, 320]) {
       await touch.setViewportSize({ width, height: 844 });
-      const labels = await touch.locator('.global-filters select').evaluateAll(elements => elements.map(element => {
+      const labels = await touch.locator('.global-filters [role=combobox]').evaluateAll(elements => elements.map(element => {
         const style = getComputedStyle(element);
         const canvas = document.createElement('canvas').getContext('2d');
         if (!canvas) throw new Error('Text measurement unavailable');
         canvas.font = style.font;
-        const value = element.querySelector('option:checked')?.textContent || '';
+        const value = element.textContent || '';
         return { value, required: canvas.measureText(value).width, available: element.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) };
       }));
       for (const label of labels) expect(label.required, `${label.value} must remain readable at ${width}px`).toBeLessThanOrEqual(label.available + 1);
@@ -794,4 +796,33 @@ test('overview leads with live campaigns and keeps native keyboard scrolling ava
   await page.locator('main').focus();
   await page.keyboard.press('PageDown');
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+});
+
+test('workspace dropdowns filter by account and custom dates with the keyboard', async ({ page }, testInfo) => {
+  await signIn(page);
+  const account = page.getByRole('combobox', { name: 'Account filter' });
+  const dateBounds = await page.getByRole('combobox', { name: 'Date range' }).boundingBox();
+  expect((await account.boundingBox())?.y).toBe(dateBounds?.y);
+  await account.focus();
+  await page.keyboard.press('Enter');
+  const accounts = page.getByRole('listbox', { name: 'Account filter' });
+  await expect(accounts.getByRole('option', { name: 'All accounts' })).toHaveAttribute('aria-selected', 'true');
+  await page.screenshot({ path: testInfo.outputPath('account-picker.png') });
+  await page.keyboard.press('End');
+  const selected = await accounts.getByRole('option').last().innerText();
+  const updated = page.waitForResponse(response => response.url().includes('/api/bootstrap?') && response.url().includes('accountId='));
+  await page.keyboard.press('Enter');
+  await updated;
+  await expect(account).toHaveText(selected);
+  await expect(account).toBeFocused();
+  const dates = page.getByRole('combobox', { name: 'Date range' });
+  await dates.click();
+  await page.keyboard.press('Escape');
+  await expect(dates).toBeFocused();
+  await chooseOption(page, 'Date range', 'Custom dates');
+  await expect(page.getByLabel('From date')).toBeVisible();
+  await chooseOption(page, 'Date range', 'Last 7 days');
+  await expect(page.getByLabel('From date')).toBeHidden();
+  await chooseOption(page, 'Account filter', 'All accounts');
+  await expect(account).toHaveText('All accounts');
 });

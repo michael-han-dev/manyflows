@@ -1,3 +1,4 @@
+import { chooseOption } from './select-option';
 import { expect, test } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
@@ -22,7 +23,7 @@ test('content campaign names and status badges stay separated at every screen si
   }
 
   await page.reload();
-  await page.getByLabel('Date range').selectOption('all');
+  await chooseOption(page, 'Date range', 'All time');
   await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Content', exact: true }).click();
   for (const width of [1440, 1280, 1024, 768, 390, 320]) {
     await page.setViewportSize({ width, height: 900 });

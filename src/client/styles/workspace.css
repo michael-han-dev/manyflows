@@ -269,16 +269,13 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  flex-wrap: wrap;
   justify-content: flex-end;
   min-width: 0;
 }
 
 .global-filters .select-control {
+  width: auto;
   max-width: 180px;
-}
-
-.global-filters select {
   color: var(--muted-foreground);
 }
 
@@ -287,22 +284,8 @@
   min-width: 0;
 }
 
-.account-select-icon {
-  position: absolute;
-  z-index: 1;
-  top: 50%;
-  left: 9px;
-  pointer-events: none;
-  color: var(--muted-foreground);
-  transform: translateY(-50%);
-}
-
 .account-select .select-control {
   max-width: 175px;
-}
-
-.account-select select {
-  padding-left: var(--space-6);
 }
 
 .demo-banner {
@@ -511,11 +494,11 @@
   color: var(--persimmon);
 }
 
-.global-filters select {
+.global-filters .select-control {
   background-color: transparent;
   border-color: transparent;
 }
 
-.global-filters select:focus-visible {
+.global-filters .select-control:focus-visible {
   border-color: var(--ring);
 }

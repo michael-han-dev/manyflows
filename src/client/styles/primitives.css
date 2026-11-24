@@ -70,53 +70,6 @@ textarea {
   line-height: 1.65;
 }
 
-select {
-  appearance: none;
-  font: inherit;
-  font-size: var(--text-md);
-  font-weight: 500;
-  line-height: 1.5;
-  -webkit-tap-highlight-color: transparent;
-  border: 1px solid var(--border);
-  background: var(--surface-1);
-  border-radius: var(--radius-sm);
-  color: var(--foreground);
-  height: var(--control-height);
-  min-height: var(--control-height);
-  width: 100%;
-  min-width: 0;
-  max-width: 100%;
-  padding: 0 var(--space-6) 0 var(--space-3);
-  cursor: pointer;
-  transition: border-color var(--motion-fast), box-shadow var(--motion-fast), background-color var(--motion-fast);
-}
-
-.select-control {
-  position: relative;
-  display: inline-flex;
-  min-width: 0;
-  max-width: 100%;
-  vertical-align: middle;
-}
-
-.select-control>svg {
-  position: absolute;
-  top: 50%;
-  right: var(--space-3);
-  transform: translateY(-50%);
-  pointer-events: none;
-  color: var(--muted-foreground);
-}
-
-select:disabled {
-  cursor: not-allowed;
-  opacity: .48;
-}
-
-select:disabled+svg {
-  opacity: .48;
-}
-
 a {
   -webkit-tap-highlight-color: transparent;
   color: var(--primary);
@@ -149,11 +102,6 @@ input:focus {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--shadow-color) 7%, transparent);
 }
 
-select:focus {
-  outline: none;
-  border-color: var(--ring);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--shadow-color) 7%, transparent);
-}
 
 textarea:focus {
   outline: none;
@@ -645,10 +593,6 @@ code {
 
 .field .select-control {
   width: 100%;
-}
-
-.field select {
-  font-size: var(--text-md);
 }
 
 .field .short-input {
