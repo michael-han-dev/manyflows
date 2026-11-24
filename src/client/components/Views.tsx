@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityLogIcon as Activity, DownloadIcon as ArrowDownToLine, ArrowRightIcon as ArrowRight, ArrowTopRightIcon as ArrowUpRight, BarChartIcon as BarChart3, CheckIcon as Check, ChevronRightIcon as ChevronRight, ExclamationTriangleIcon as CircleAlert, CopyIcon as Copy, TrashIcon as Trash, DownloadIcon as Download, FileTextIcon as FileText, RocketIcon as FlaskConical, ImageIcon as Image, CameraIcon as Camera, EnvelopeClosedIcon as Mail, ChatBubbleIcon as MessageCircle, CursorArrowIcon as MousePointer2, PauseIcon as Pause, PlayIcon as Play, PlusIcon as Plus, ReloadIcon as RefreshCw, MagnifyingGlassIcon as Search, PaperPlaneIcon as Send, MixerHorizontalIcon as Settings2, CheckCircledIcon as ShieldCheck, PersonIcon as Users } from '@radix-ui/react-icons';
+import { ActivityLogIcon as Activity, DownloadIcon as ArrowDownToLine, ArrowRightIcon as ArrowRight, ArrowTopRightIcon as ArrowUpRight, BarChartIcon as BarChart3, ChevronRightIcon as ChevronRight, ExclamationTriangleIcon as CircleAlert, CopyIcon as Copy, TrashIcon as Trash, DownloadIcon as Download, FileTextIcon as FileText, RocketIcon as FlaskConical, ImageIcon as Image, CameraIcon as Camera, ChatBubbleIcon as MessageCircle, PauseIcon as Pause, PlayIcon as Play, PlusIcon as Plus, ReloadIcon as RefreshCw, MagnifyingGlassIcon as Search, MixerHorizontalIcon as Settings2, CheckCircledIcon as ShieldCheck, PersonIcon as Users } from '@radix-ui/react-icons';
 import type { Account, Bootstrap, Campaign, Contact, FlowRun, Media } from '../../shared/domain';
 import { ApiError } from '../api';
 import { Button, CopyButton, date, Dialog, DownloadButton, Empty, ExternalLink, Icon, number, rate, Spinner, Status, time } from './ui';
@@ -8,22 +8,103 @@ import { CampaignTarget, targetIncludesMedia } from './CampaignTarget';
 import { MoreActions } from './MoreActions';
 import { DeleteDataDialog } from './DeleteDataDialog';
 
+import './overview.css';
+
 type SharedProps = { data: Bootstrap; accountId: string };
 const username = (data: Bootstrap, id: string) => data.accounts.find(account => account.id === id)?.username ?? 'Unknown account';
 
 export function Overview({ data, accountId, onCreate, onCampaigns, onActivity, onDemo }: SharedProps & { onCreate: () => void; onCampaigns: () => void; onActivity: () => void; onDemo: () => void }) {
-  const m = data.metrics;
-  const funnel = [{ title: 'Matched comments', count: m.matchedComments, note: 'Campaign entries' }, { title: 'Opening messages', count: m.openingAccepted, note: 'API accepted' }, { title: 'Button responses', count: m.buttonResponders, note: 'Unique responding contacts' }, { title: 'Resource messages', count: m.linkMessagesAccepted, note: 'API accepted' }, { title: 'Link visits', count: m.uniqueClickers, note: 'Unique attributed contacts' }];
-  const reportableReach = data.media.filter(item => item.reach !== null);
-  const totalReach = reportableReach.length ? reportableReach.reduce((sum, item) => sum + (item.reach ?? 0), 0) : null;
-  return <><div className="page-heading"><div><div className="eyebrow">YOUR WORKSPACE</div><h1>A clearer view of every conversation.</h1><p>Follow the journey from a comment to a connection.</p></div><Button variant="primary" onClick={onCreate}><Icon icon={Plus} size={17} />Create campaign</Button></div><div className="metric-grid"><Metric label="Matched comments" value={number(m.matchedComments)} note="Comments entering a flow" icon={MessageCircle} /><Metric label="Opening messages" value={number(m.openingAccepted)} note="API accepted · delivery unavailable" icon={Send} /><Metric label="Emails collected" value={number(m.emailsCollected)} note="Valid email addresses captured" icon={Mail} /><Metric label="Link click-through" value={rate(m.uniqueClickers, m.linkMessagesAccepted)} note={`${number(m.uniqueClickers)} attributed clickers / ${number(m.linkMessagesAccepted)} link messages`} icon={MousePointer2} /></div>
-    {!data.accounts.length && <section className="onboarding-card"><div className="onboarding-art"><Icon icon={MessageCircle} size={44} /><span><Icon icon={Check} size={21} /></span></div><div><span className="eyebrow">LET’S GET YOU STARTED</span><h2>Your next conversation starts with a comment.</h2><p>Connect your Instagram accounts in Settings, or explore a local demo workspace with sample content and real saved campaigns.</p><div className="inline wrap">{data.configuration.demoEnabled && <Button variant="primary" onClick={onDemo}><Icon icon={FlaskConical} size={16} />Set up demo workspace</Button>}<span className="field-hint">No campaigns run until you publish them.</span></div></div></section>}
-    <div className="overview-grid"><section className="card funnel-card"><div className="card-heading"><div><h2>Your conversation funnel</h2><p>See where comments become conversations.</p></div><Icon icon={BarChart3} /></div><div className="funnel">{funnel.map((step, index) => <div className="funnel-row" key={step.title}><span className="funnel-index">0{index + 1}</span><div className="funnel-label"><strong>{step.title}</strong><small>{step.note}</small></div><div className="funnel-track"><span style={{ width: `${m.matchedComments ? Math.min(100, step.count / m.matchedComments * 100) : 0}%`, opacity: 1 - index * 0.13 }} /></div><strong className="funnel-count">{number(step.count)}</strong></div>)}</div><div className="funnel-footer"><span>Button response rate <strong>{rate(m.buttonResponders, m.openingAccepted)}</strong></span><span>Flow completion <strong>{rate(m.completedRuns, data.runs.length)}</strong></span></div><details className="metric-definitions"><summary>How these numbers are calculated</summary><p>Button response rate is unique responding contacts divided by API-accepted opening messages. Link click-through is unique attributed clicking contacts divided by API-accepted link messages. Completion is completed runs divided by started runs. A dash means the denominator is zero.</p><p>Counts reflect the selected account and dates. Link previews or forwarded links may record visits; they do not prove the original recipient visited.</p></details></section><section className="card accounts-summary"><div className="card-heading"><div><h2>Your accounts</h2><p>Separate accounts. One workspace.</p></div><Icon icon={Camera} /></div>{data.accounts.filter(account => !accountId || account.id === accountId).map(account => <div className="account-summary-row" key={account.id}><span className="avatar">{account.name.slice(0, 1)}</span><div><strong>@{account.username}</strong><small>{account.mode === 'demo' ? 'Demo workspace' : account.name}</small></div><Status value={account.status} /></div>)}{!data.accounts.length && <p className="muted padded">Your connected accounts will appear here.</p>}<div className="reach-summary"><span>{accountId ? 'Reported content reach' : 'Combined content reach'}</span><strong>{number(totalReach)}</strong><small>{accountId ? 'Sum of available content reach.' : 'Sum across accounts and posts. People are not deduplicated.'}{reportableReach.length < data.media.length && ' Some content has no available insights.'}</small></div></section></div>
-    <section className="card"><div className="card-heading"><div><h2>Campaigns at work</h2><p>What your published conversations are doing.</p></div><button className="text-button" onClick={onCampaigns}>All campaigns<Icon icon={ArrowRight} size={15} /></button></div>{data.campaigns.length ? <div className="table-scroll"><table><thead><tr><th>Campaign</th><th>Status</th><th>Started</th><th>Completed</th><th>Waiting</th><th>Completion</th></tr></thead><tbody>{data.campaigns.slice(0, 5).map(campaign => { const runs = data.runs.filter(run => run.campaignId === campaign.id); const completed = runs.filter(run => run.state === 'complete').length; return <tr key={campaign.id}><td><strong>{campaign.name}</strong><small>@{username(data, campaign.accountId)}</small></td><td><Status value={campaign.status} /></td><td>{number(runs.length)}</td><td>{number(completed)}</td><td>{number(runs.filter(run => run.state === 'waiting' || run.state === 'delayed').length)}</td><td>{rate(completed, runs.length)}</td></tr>; })}</tbody></table></div> : <Empty title="Make your first connection" text="Create a comment-to-link campaign, choose your content, and give your audience something useful." action={<Button onClick={onCreate}><Icon icon={Plus} size={16} />Create your first campaign</Button>} icon={MessageCircle} />}</section>{m.failedActions > 0 && <button className="attention-banner" onClick={onActivity}><Icon icon={CircleAlert} /><span><strong>{number(m.failedActions)} actions need attention</strong>Review failed or uncertain sends in Activity.</span><Icon icon={ArrowRight} /></button>}</>;
-}
+  const { metrics, accounts, campaigns, media, runs } = data;
+  const liveCampaigns = campaigns.filter(campaign => campaign.status === 'live');
+  const featuredCampaigns = [...liveCampaigns, ...campaigns.filter(campaign => campaign.status !== 'live')].slice(0, 5);
+  const funnel = [
+    { label: 'Matched comments', count: metrics.matchedComments, note: 'Campaign entries' },
+    { label: 'Opening messages', count: metrics.openingAccepted, note: 'API accepted' },
+    { label: 'Button responses', count: metrics.buttonResponders, note: 'Unique responding contacts' },
+    { label: 'Resource messages', count: metrics.linkMessagesAccepted, note: 'API accepted' },
+    { label: 'Link visits', count: metrics.uniqueClickers, note: 'Unique attributed contacts' },
+  ];
+  const largestStage = Math.max(1, ...funnel.map(stage => stage.count));
+  const reportableReach = media.flatMap(item => item.reach === null ? [] : [item.reach]);
+  const totalReach = reportableReach.length ? reportableReach.reduce((sum, reach) => sum + reach, 0) : null;
+  const highlights = [
+    { label: 'Matched comments', value: number(metrics.matchedComments), note: 'Comments entering a flow' },
+    { label: 'Opening messages', value: number(metrics.openingAccepted), note: 'API accepted · delivery unavailable' },
+    { label: 'Emails collected', value: number(metrics.emailsCollected), note: 'Valid email addresses captured' },
+    { label: 'Link click-through', value: rate(metrics.uniqueClickers, metrics.linkMessagesAccepted), note: `${number(metrics.uniqueClickers)} attributed clickers / ${number(metrics.linkMessagesAccepted)} link messages` },
+  ];
 
-function Metric({ label, value, note, icon }: { label: string; value: string; note: string; icon: typeof Mail }) {
-  return <section className="card metric"><div><span>{label}</span><Icon icon={icon} size={17} /></div><strong>{value}</strong><small>{note}</small></section>;
+  return <div className="workspace-overview">
+    <header className="page-heading">
+      <h1>Overview</h1>
+      <Button variant="primary" onClick={onCreate}><Icon icon={Plus} size={17} />Create campaign</Button>
+    </header>
+
+    {!accounts.length && <section className="overview-setup">
+      <h2>Connect your first account</h2>
+      <p>Add an Instagram account in Settings{data.configuration.demoEnabled ? ', or explore a demo with sample content and saved campaigns.' : ' to start building campaigns.'}</p>
+      {data.configuration.demoEnabled && <Button onClick={onDemo}><Icon icon={FlaskConical} size={16} />Set up demo workspace</Button>}
+    </section>}
+
+    <section className="overview-performance" aria-labelledby="campaign-performance">
+      <header className="overview-section-heading">
+        <div><h2 id="campaign-performance">Campaign performance</h2><p>{number(liveCampaigns.length)} live · {number(campaigns.length)} total</p></div>
+        <button className="text-button" onClick={onCampaigns}>All campaigns<Icon icon={ArrowRight} size={15} /></button>
+      </header>
+      {featuredCampaigns.length ? <div className="overview-campaign-list">
+        {featuredCampaigns.map(campaign => {
+          const campaignRuns = runs.filter(run => run.campaignId === campaign.id);
+          const completed = campaignRuns.filter(run => run.state === 'complete').length;
+          const waiting = campaignRuns.filter(run => run.state === 'waiting' || run.state === 'delayed').length;
+          return <article className="overview-campaign" key={campaign.id}>
+            <div className="overview-campaign-name"><h3>{campaign.name}</h3><small>@{username(data, campaign.accountId)}</small></div>
+            <Status value={campaign.status} />
+            <dl>{[
+              ['Started', number(campaignRuns.length)], ['Completed', number(completed)],
+              ['Waiting', number(waiting)], ['Completion', rate(completed, campaignRuns.length)],
+            ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+          </article>;
+        })}
+      </div> : <Empty title="No campaigns yet" text="Choose a post and write the reply people will receive when they comment." action={<Button onClick={onCreate}>Create your first campaign<Icon icon={ArrowRight} size={15} /></Button>} icon={MessageCircle} />}
+    </section>
+
+    {metrics.failedActions > 0 && <button className="attention-banner" onClick={onActivity}><Icon icon={CircleAlert} /><span><strong>{number(metrics.failedActions)} actions need attention</strong>Review failed or uncertain sends in Activity.</span><Icon icon={ArrowRight} /></button>}
+
+    <section className="overview-results" aria-label="Workspace results">
+      <dl>{highlights.map(item => <div key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd><dd className="overview-note">{item.note}</dd></div>)}</dl>
+    </section>
+
+    <div className="overview-reports">
+      <section aria-labelledby="conversation-funnel">
+        <h2 id="conversation-funnel">Conversation funnel</h2>
+        <ol className="overview-stages">{funnel.map(step => <li key={step.label}>
+          <div><strong>{step.label}</strong><small>{step.note}</small></div>
+          <span className="overview-track" aria-hidden="true"><i style={{ width: `${step.count / largestStage * 100}%` }} /></span>
+          <span className="overview-count">{number(step.count)}</span>
+        </li>)}</ol>
+        <dl className="overview-ratios">
+          <div><dt>Button response rate</dt><dd>{rate(metrics.buttonResponders, metrics.openingAccepted)}</dd></div>
+          <div><dt>Flow completion</dt><dd>{rate(metrics.completedRuns, runs.length)}</dd></div>
+        </dl>
+        <details className="overview-definitions"><summary>How these numbers are calculated</summary>
+          <p>Button response rate is unique responding contacts divided by API-accepted opening messages. Link click-through is unique attributed clicking contacts divided by API-accepted link messages. Completion is completed runs divided by started runs. A dash means the denominator is zero.</p>
+          <p>Counts reflect the selected account and dates. Link previews and forwarded links can record visits without the original recipient opening the link.</p>
+        </details>
+      </section>
+
+      <section aria-labelledby="overview-accounts">
+        <h2 id="overview-accounts">Your accounts</h2>
+        <ul className="overview-accounts">{accounts.filter(account => !accountId || account.id === accountId).map(account => <li key={account.id}>
+          <span className="avatar">{account.name.slice(0, 1)}</span>
+          <div><strong>@{account.username}</strong><small>{account.mode === 'demo' ? 'Demo workspace' : account.name}</small></div>
+          <Status value={account.status} />
+        </li>)}</ul>
+        {!accounts.length && <p className="overview-note">Connected accounts will appear here.</p>}
+        <dl className="overview-reach"><dt>{accountId ? 'Reported content reach' : 'Combined content reach'}</dt><dd>{number(totalReach)}</dd></dl>
+        <p className="overview-note">{accountId ? 'Sum of available content reach.' : 'Sum across accounts and posts. People are not deduplicated.'}{reportableReach.length < media.length && ' Some content has no available insights.'}</p>
+      </section>
+    </div>
+  </div>;
 }
 
 export function Campaigns({ data, onCreate, onEdit, onAction }: { data: Bootstrap; onCreate: () => void; onEdit: (campaign: Campaign) => void; onAction: (campaign: Campaign, action: 'publish' | 'pause' | 'duplicate') => void }) {

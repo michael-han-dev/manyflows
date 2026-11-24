@@ -1,0 +1,99 @@
+.workspace-overview {
+  display: grid;
+  gap: clamp(24px, 3vw, 46px);
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.workspace-overview .page-heading { margin: 0; }
+.workspace-overview h2 { font-size: clamp(20px, 2.2vw, 27px); letter-spacing: -.045em; line-height: 1.15; }
+.workspace-overview dl, .workspace-overview dd, .workspace-overview ol, .workspace-overview ul { margin: 0; }
+.workspace-overview ul, .workspace-overview ol { padding: 0; list-style: none; }
+
+.overview-setup, .overview-performance {
+  background: var(--card);
+  border-radius: 16px;
+  padding: clamp(18px, 2.5vw, 34px);
+  min-width: 0;
+}
+.overview-setup { background: var(--secondary); }
+.overview-setup p { margin: 8px 0 16px; color: var(--muted-foreground); }
+.overview-section-heading { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 10px 16px; }
+.overview-section-heading p { margin: 7px 0 0; font-size: 13px; color: var(--muted-foreground); }
+.workspace-overview .overview-section-heading .text-button { color: var(--ink); }
+.overview-campaign-list { margin-top: 18px; }
+.overview-campaign {
+  display: grid;
+  grid-template-columns: minmax(100px, 1fr) 76px minmax(260px, 1.2fr);
+  align-items: center;
+  gap: 18px;
+  padding: 15px 0;
+  border-top: 1px solid var(--border);
+}
+.overview-campaign:last-child { padding-bottom: 0; }
+.overview-campaign h3 { margin: 0; font-size: 15px; font-weight: 570; letter-spacing: -.025em; overflow-wrap: anywhere; }
+.overview-campaign small, .overview-accounts small, .overview-stages small,
+.workspace-overview .overview-note {
+  color: var(--muted-foreground);
+  display: block;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.overview-campaign .status { justify-self: start; }
+.overview-campaign dl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.overview-campaign dt, .overview-ratios dt { font-size: 12px; color: var(--muted-foreground); }
+.overview-campaign dd, .overview-count, .overview-ratios dd { font-variant-numeric: tabular-nums; }
+.overview-campaign dd { font-size: 15px; font-weight: 550; margin-top: 2px; }
+
+.overview-results dl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 22px; }
+.overview-results dl > div { border-top: 2px solid var(--ink); padding-top: 14px; }
+.overview-results dt, .overview-reach dt { font-size: 13px; font-weight: 540; }
+.overview-results dd:first-of-type, .overview-reach dd {
+  font-size: clamp(32px, 3.6vw, 54px);
+  line-height: 1.13;
+  letter-spacing: -.065em;
+  font-weight: 480;
+  margin: 8px 0;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.overview-reports { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: clamp(28px, 4vw, 64px); }
+.overview-reports > section { min-width: 0; }
+.workspace-overview .overview-stages, .workspace-overview .overview-accounts { margin-top: 16px; }
+.overview-stages li {
+  display: grid;
+  grid-template-columns: minmax(113px, .85fr) minmax(36px, 1fr) minmax(28px, auto);
+  gap: 14px;
+  align-items: center;
+  padding: 8px 0;
+}
+.overview-stages strong, .overview-accounts strong { font-weight: 540; font-size: 14px; }
+.overview-track { display: block; height: 8px; background: var(--secondary); border-radius: 2px; overflow: hidden; }
+.overview-track i { display: block; height: 100%; background: var(--persimmon); }
+.overview-count { text-align: right; font-size: 14px; }
+.workspace-overview .overview-ratios { display: flex; flex-wrap: wrap; gap: 20px 40px; margin-top: 18px; padding: 16px 0; border-top: 1px solid var(--border); }
+.overview-ratios dd { font-size: 20px; letter-spacing: -.04em; }
+.overview-definitions { font-size: 12px; color: var(--muted-foreground); }
+.overview-definitions summary { cursor: pointer; width: fit-content; padding: 6px 0; }
+.overview-definitions p { max-width: 68ch; margin: 8px 0; line-height: 1.65; }
+.overview-accounts li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.overview-accounts strong { overflow-wrap: anywhere; }
+.workspace-overview .overview-reach { margin-top: 24px; }
+.overview-reach dd { font-size: 34px; }
+.workspace-overview .attention-banner { margin: 0; }
+
+@container (max-width: 720px) {
+  .overview-campaign { grid-template-columns: minmax(0, 1fr) auto; gap: 12px; }
+  .overview-campaign dl { grid-column: 1 / -1; }
+  .overview-campaign .status { justify-self: end; }
+  .overview-reports { grid-template-columns: 1fr; }
+  .overview-results dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@container (max-width: 350px) {
+  .overview-campaign dt { font-size: 11px; }
+  .overview-campaign dl { column-gap: 4px; }
+  .overview-section-heading { align-items: center; }
+  .overview-stages li { gap: 8px; }
+}
