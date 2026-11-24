@@ -1,6 +1,6 @@
 .app-shell {
   display: flex;
-  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .sidebar {
@@ -150,11 +150,11 @@
 
 .sidebar-bottom {
   margin-top: auto;
-  padding: var(--space-4);
   flex-shrink: 0;
 }
 
 .demo-shortcut {
+  margin-inline: var(--space-3);
   background: transparent;
   border: 1px solid transparent;
   display: flex;
@@ -163,7 +163,7 @@
   border-radius: var(--radius-sm);
   color: var(--muted-foreground);
   padding: var(--space-3) var(--space-3);
-  width: 100%;
+  width: calc(100% - 2 * var(--space-3));
   text-align: left;
 }
 
@@ -188,9 +188,9 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  border-top: 1px solid var(--border);
   margin-top: var(--space-4);
-  padding-top: var(--space-4);
+  padding-inline: var(--space-4);
+  justify-content: space-between;
 }
 
 .owner-avatar {
@@ -204,27 +204,6 @@
   justify-content: center;
   font-size: var(--text-md);
   flex-shrink: 0;
-}
-
-.owner-row>div {
-  flex: 1;
-  min-width: 0;
-}
-
-.owner-row strong {
-  font-size: var(--text-md);
-  font-weight: 600;
-  color: var(--foreground);
-  display: block;
-  overflow-wrap: anywhere;
-}
-
-.owner-row small {
-  font-size: var(--text-sm);
-  color: var(--muted-foreground);
-  display: block;
-  margin-top: 3px;
-  overflow-wrap: anywhere;
 }
 
 .owner-row .icon-button {
@@ -242,7 +221,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .topbar {
@@ -464,9 +443,15 @@
   font-size: var(--text-md);
 }
 
+.owner-row,
 .app-footer {
-  padding: var(--space-4) var(--space-6);
+  min-height: var(--workspace-footer-height);
+  align-items: center;
   border-top: 1px solid var(--border);
+}
+
+.app-footer {
+  padding: var(--space-1) var(--page-gutter);
   display: flex;
   justify-content: space-between;
   gap: var(--space-4);
@@ -524,10 +509,6 @@
 
 .sidebar .brand-logo>svg, .login-story .brand-logo>svg {
   color: var(--persimmon);
-}
-
-.sidebar .owner-row {
-  justify-content: space-between;
 }
 
 .global-filters select {

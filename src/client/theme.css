@@ -86,6 +86,7 @@
   --radius-lg: 16px;
   --control-height: 36px;
   --control-height-sm: 32px;
+  --workspace-footer-height: calc(var(--control-height) + var(--space-3));
   --sidebar-width: 224px;
   --page-width: 1440px;
   --page-gutter: clamp(16px, 3vw, 40px);
