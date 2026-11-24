@@ -22,13 +22,17 @@ Typography, alignment, and whitespace give the workspace its character. Table va
 
 - Use `PageHeading` for the title, optional supporting text, and page action. In the editor, keep Save draft and Publish together.
 - Use `Button`, `IconButton`, `Field`, `Toggle`, `Status`, and `Dialog` from `components/ui.tsx`. Name icon-only controls for assistive technology. Keep focus indicators visible.
+- Use the shared `Select` for single-choice filters and fields. Keep the trigger text and chevron aligned, show the selected option with a checkmark, and allow typing or arrow keys to move through options.
 - Use `MoreActions` for occasional record actions. Its portal keeps menus visible at the edge of a scrolling table. Arrow keys move through items, Escape dismisses the menu, and destructive actions open the existing confirmation dialog.
 - Use `MediaThumbnail` for post images and their media-type fallback. The editor and Content view share the same implementation.
+- Show each conversion rate alongside its numerator and denominator. Right-align the rate column so percentages remain comparable when descriptions wrap.
+- Align the sidebar owner row and workspace footer using `--workspace-footer-height`.
+- Display a specific post or reel inside the account preview. Show the whole image in Post and Comments, and a compact attachment above the DM conversation.
 - Keep the preview prominent on wide editor layouts. At narrow widths, keep the form and preview readable in one column. Hide scrollbar tracks while preserving native wheel, touch, and keyboard scrolling.
 - Keep feedback on frequently used controls brief. Respect reduced motion. Data updates and keyboard navigation should be immediately legible.
 
 ## Implementation and verification
 
-`src/client/styles.css` is the import manifest. Shared controls, the shell, records, the campaign editor, Demo Studio, login, and responsive rules have dedicated stylesheets in `src/client/styles/`. Overview and MoreActions own their scoped styles beside their components. Reference theme tokens for shared design values and use component-local variables for layout dimensions specific to a surface.
+`src/client/styles.css` is the import manifest. Shared controls, the shell, records, the campaign editor, Demo Studio, login, and responsive rules have dedicated stylesheets in `src/client/styles/`. Overview, Select, and MoreActions own their scoped styles beside their components. Reference theme tokens for shared design values and use component-local variables for layout dimensions specific to a surface.
 
 Run `npm run check` and `npm run test:e2e` after UI changes. The Playwright suite exercises the running application and its HTTP endpoints, including keyboard and touch interactions and desktop, tablet, and phone layouts.

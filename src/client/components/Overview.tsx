@@ -18,7 +18,7 @@ export function Overview({ data, accountId, onCreate, onCampaigns, onActivity, o
   const featuredCampaigns = [...liveCampaigns, ...campaigns.filter(campaign => campaign.status !== 'live')].slice(0, featuredCampaignLimit);
   const funnel = [
     { label: 'Comments matched', count: metrics.matchedComments, note: 'Campaigns triggered by a comment' },
-    { label: 'Opening DMs', count: metrics.openingAccepted, note: 'Private replies accepted by Instagram' },
+    { label: 'Opening DMs', count: metrics.openingAccepted, note: 'Opening private replies accepted for sending' },
     { label: 'Button responders', count: metrics.buttonResponders, note: 'Contacts who tapped a reply button' },
     { label: 'Messages with links', count: metrics.linkMessagesAccepted, note: 'Accepted messages with a link button' },
     { label: 'Link visitors', count: metrics.uniqueClickers, note: 'Contacts credited with a link visit' },
@@ -28,7 +28,7 @@ export function Overview({ data, accountId, onCreate, onCampaigns, onActivity, o
   const totalReach = reportableReach.length ? reportableReach.reduce((sum, reach) => sum + reach, 0) : null;
   const highlights = [
     { label: 'Conversations started', value: metrics.matchedComments, note: 'A comment triggered a campaign.' },
-    { label: 'Opening DMs', value: metrics.openingAccepted, note: 'Instagram accepted the private reply.' },
+    { label: 'Opening DMs', value: metrics.openingAccepted, note: 'Opening private replies accepted for sending.' },
     { label: 'Email contacts', value: metrics.emailsCollected, note: 'Each contact who shared an email counts once.' },
     { label: 'Link visitors', value: metrics.uniqueClickers, note: 'Each contact credited with a link visit counts once.' },
   ];
@@ -102,7 +102,7 @@ export function Overview({ data, accountId, onCreate, onCampaigns, onActivity, o
         <details className="overview-definitions"><summary>How to read these numbers</summary>
           <ul>
             <li><strong>Time period.</strong> Counts follow the selected accounts and dates. A response or visit can come from a message sent earlier.</li>
-            <li><strong>Message status.</strong> Instagram acknowledges each accepted message. Delivery and read status are unavailable.</li>
+            <li><strong>Message status.</strong> For live accounts, Instagram accepted the request to send. Demo sends are simulated. Delivery and read status are unavailable.</li>
             <li><strong>Link attribution.</strong> Forwarded links and link previews can register a visit under the original contact. Known automated visits are excluded.</li>
             <li><strong>Missing rates.</strong> A dash means there were no messages or conversations to divide by.</li>
           </ul>
