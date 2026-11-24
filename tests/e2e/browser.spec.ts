@@ -809,11 +809,12 @@ test('workspace dropdowns filter by account and custom dates with the keyboard',
   await expect(accounts.getByRole('option', { name: 'All accounts' })).toHaveAttribute('aria-selected', 'true');
   await page.screenshot({ path: testInfo.outputPath('account-picker.png') });
   await page.keyboard.press('End');
-  const selected = await accounts.getByRole('option').last().innerText();
-  const updated = page.waitForResponse(response => response.url().includes('/api/bootstrap?') && response.url().includes('accountId='));
+  const lastAccount = accounts.getByRole('option').last();
+  await expect(lastAccount).toBeFocused();
+  const selected = await lastAccount.innerText();
   await page.keyboard.press('Enter');
-  await updated;
   await expect(account).toHaveText(selected);
+  await expect(page.getByRole('region', { name: 'Your accounts' }).getByRole('listitem')).toHaveCount(1);
   await expect(account).toBeFocused();
   const dates = page.getByRole('combobox', { name: 'Date range' });
   await dates.click();
