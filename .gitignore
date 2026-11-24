@@ -42,3 +42,6 @@ wrangler.production.jsonc
 wrangler.production.json
 manyflows_setup.md
 /rebuild.md
+
+# Saved browser sessions can include owner cookies.
+playwright/.auth/

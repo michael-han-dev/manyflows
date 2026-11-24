@@ -1,3 +1,4 @@
+import { MediaThumbnail } from './MediaThumbnail';
 import { MoreActions } from './MoreActions';
 import { useEffect, useState } from 'react';
 import { ArrowLeftIcon as ArrowLeft, CheckIcon as Check, CopyIcon as Copy, FileTextIcon as FileText, ImageIcon as Image, LayersIcon as Layers3, PauseIcon as Pause, PlayIcon as Play, PlusIcon as Plus, CheckIcon as Save, MagicWandIcon as Sparkles, TrashIcon as Trash2 } from '@radix-ui/react-icons';
@@ -137,10 +138,6 @@ export function CampaignEditor({ campaign, initial, accounts, media, onBack, onS
 }
 
 function splitKeywords(value: string): string[] { return value.split(/[,\n]/).map(item => item.trim()).filter(Boolean); }
-
-export function MediaThumbnail({ media, large = false }: { media: Media; large?: boolean }) {
-  return <span className={`media-thumbnail ${large ? 'large' : ''}`}>{media.thumbnailUrl ? <img src={media.thumbnailUrl} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }} /> : null}<Icon icon={media.type === 'REELS' || media.type === 'VIDEO' ? Play : Image} size={large ? 26 : 19} /></span>;
-}
 
 function Validation({ issues }: { issues: string[] }) {
   return <div className={`flow-validation ${issues.length ? '' : 'valid'}`} role="status"><Icon icon={issues.length ? FileText : Check} size={18} /><div><strong>{issues.length ? `${issues.length} ${issues.length === 1 ? 'check needs' : 'checks need'} attention` : 'Flow checks passed'}</strong>{issues.length ? <ul>{issues.map(issue => <li key={issue}>{issue}</li>)}</ul> : <p>The flow is connected and ready for publication checks.</p>}</div></div>;

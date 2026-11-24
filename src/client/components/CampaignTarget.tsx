@@ -2,7 +2,7 @@ import type { CampaignInput } from '../../shared/domain';
 
 type Target = CampaignInput['target'];
 
-export function targetLabel(target: Target, boundMediaId: string | null = null) {
+function targetLabel(target: Target, boundMediaId: string | null = null) {
   switch (target.kind) {
     case 'all': return 'All posts and reels';
     case 'specific': return 'Specific post or reel';

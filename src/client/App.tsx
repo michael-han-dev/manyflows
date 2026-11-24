@@ -3,8 +3,9 @@ import { ActivityLogIcon as Activity, ArrowRightIcon as ArrowRight, CheckIcon as
 import { defaultCampaign, type Bootstrap, type Campaign, type CampaignInput, type Media } from '../shared/domain';
 import { ApiError, campaignSchema, getBootstrap, getSession, request } from './api';
 import { CampaignEditor } from './components/CampaignEditor';
+import { Overview } from './components/Overview';
 import { DemoStudio } from './components/DemoStudio';
-import { ActivityView, Campaigns, Contacts, Content, Inbox, Overview, Settings } from './components/Views';
+import { ActivityView, Campaigns, Contacts, Content, Inbox, Settings } from './components/Views';
 import { Select, IconButton, Button, Empty, Icon, Spinner, UnsavedChangesDialog } from './components/ui';
 
 type Page = 'overview' | 'campaigns' | 'content' | 'inbox' | 'contacts' | 'activity' | 'settings';
